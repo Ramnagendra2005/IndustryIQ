@@ -1,0 +1,6 @@
+INCIDENT / FAILURE REPORT  INC-2023-14  Unit CDU-1
+Equipment: P-102 (crude charge pump, sister to P-101)
+Event: Catastrophic drive-end bearing seizure leading to shaft damage; pump removed from service. Unplanned downtime 18 hours; standby unavailable so throughput cut 30%.
+ROOT CAUSE ANALYSIS (5-Why): repeat bearing failures -> bearings running hot -> coupling MISALIGNMENT -> baseplate SOFT FOOT (0.09 mm) never corrected since installation -> commissioning alignment accepted out of tolerance.
+Root cause: uncorrected baseplate soft foot causing chronic coupling misalignment.
+Corrective action: shimmed baseplate, laser-aligned coupling to 0.02 mm, added soft-foot check to PM. Lesson learned: treat repeat bearing failures on KDP-300 pumps as MISALIGNMENT until proven otherwise — do not just replace bearings.

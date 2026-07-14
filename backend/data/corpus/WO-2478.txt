@@ -1,0 +1,6 @@
+WORK ORDER WO-2478  Priority: P1  Unit CDU-1
+Equipment: P-101 (crude charge pump)
+Symptom: High vibration trip on VT-101 (7.0 mm/s), pump tripped on protection.
+Action taken: Replaced BOTH drive-end and non-drive-end bearings (SKF 6312). Ran solo — vibration 3.9 mm/s after replacement. Coupling guard removed for access and NOT reinstalled at close-out (flagged for follow-up).
+NOTE by fitter A. Khan: 'This is the second bearing issue on P-101 in 3 months. Bearings looked spalled on the loaded side — recommend checking alignment.'
+Status: Closed. Craft: A. Khan.

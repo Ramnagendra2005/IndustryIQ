@@ -1,0 +1,7 @@
+PIPING & INSTRUMENTATION DIAGRAM  DWG PID-CDU1-002  Rev 3
+Unit: CDU-1 Crude Distillation Unit — Charge Pump Loop
+
+Crude feed Tank T-01 --> suction header --> Pump P-101 (crude charge pump, operating) --> discharge --> Heat Exchanger E-204 (crude preheat) --> Distillation Column C-301 feed nozzle.
+Pump P-102 is an IDENTICAL spared standby pump on the same suction/discharge header, cross-tied via valve MOV-114.
+Vibration transmitter VT-101 and temperature TT-101 mounted on P-101 bearing housing. Pressure PT-204 on E-204 shell outlet.
+Instrument tags: VT-101, TT-101, PT-204, MOV-114, PSV-301 (on C-301).

@@ -1,0 +1,7 @@
+KIRLOSKAR KDP-300 CENTRIFUGAL PUMP — OPERATION & MAINTENANCE MANUAL
+Applies to tags P-101 and P-102 (identical units).
+
+Vibration limits (bearing housing, RMS velocity): ALARM 4.5 mm/s, TRIP 7.1 mm/s.
+Shaft alignment: cold parallel/angular offset must be within 0.05 mm; excessive misalignment is the leading cause of premature bearing and seal failure.
+Baseplate: check for soft foot at every coupling service; foot deflection > 0.05 mm must be corrected — soft foot induces frame distortion and misalignment.
+Bearing: SKF 6312 C3, rated L10 life 40,000 h at design load. Repeated short bearing life indicates an external cause (misalignment, soft foot, unbalance), NOT bearing quality — investigate the installation, do not simply replace the bearing.

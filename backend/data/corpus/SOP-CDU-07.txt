@@ -1,0 +1,4 @@
+STANDARD OPERATING PROCEDURE  SOP-CDU-07  Rev 2
+Title: Crude Charge Pump (P-101/P-102) Changeover, Bearing Service & Alignment.
+Scope: applies to KDP-300 pumps in CDU-1. References OISD-STD-116 (rotating equipment) and the KDP-300 OEM manual.
+Key steps: 4.3 Before returning a pump to service after ANY bearing or seal job, perform laser shaft alignment (tolerance 0.05 mm) AND a soft-foot check. 4.7 Reinstate the coupling guard before start-up (Factory Act guarding requirement). 4.9 Record post-job vibration; if > 4.5 mm/s, do not accept the job — investigate alignment.

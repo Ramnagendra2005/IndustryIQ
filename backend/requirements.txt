@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+anthropic
+pydantic
+python-multipart
+networkx
+rank-bm25
+numpy
+pandas
+openpyxl
+pypdf
+python-dotenv
+model2vec

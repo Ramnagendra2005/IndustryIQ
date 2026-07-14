@@ -1,0 +1,5 @@
+CONDITION MONITORING / VIBRATION SURVEY  Report INS-088
+Asset: P-101 crude charge pump, Unit CDU-1  Analyst: P. Iyer (CAT-II)
+Overall vibration: 7.2 mm/s RMS (ISO 10816-3 Zone D — UNACCEPTABLE, above alarm 4.5 mm/s).
+Spectrum: dominant 1x and 2x running speed peaks with axial component — CLASSIC SIGNATURE OF SHAFT/COUPLING MISALIGNMENT. Bearing defect frequencies (BPFO) also present, indicating outer-race wear.
+Finding: Vibration signature consistent with misalignment driving repeat bearing damage. Recommend laser shaft alignment and soft-foot check before next bearing change. Baseplate condition to be verified.

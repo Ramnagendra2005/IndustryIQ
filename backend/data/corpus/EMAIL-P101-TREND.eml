@@ -1,0 +1,6 @@
+From: p.iyer@refinery.example (Reliability)
+To: maint.planner@refinery.example; cdu1.super@refinery.example
+Date: 2024-06-20
+Subject: P-101 vibration creeping up again — please schedule alignment
+
+Team, since the March bearing change (WO-2478) P-101 vibration has climbed back to ~5.8 mm/s (WO-2502) and my May survey INS-088 shows a misalignment signature. This is the SAME pattern that killed P-102 last year (INC-2023-14, soft foot). Please do NOT just swap the bearing again — we need a laser alignment + soft-foot check per SOP-CDU-07. Also the coupling guard has been off since March, which is a Factory Act issue. — Priya

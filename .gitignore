@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+frontend/dist/
+
+# Data caches (generated)
+backend/data/seed/*.json
+!backend/data/seed/.gitkeep
+
+# Models cache
+.cache/

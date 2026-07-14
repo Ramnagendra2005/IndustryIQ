@@ -1,0 +1,5 @@
+WORK ORDER WO-2502  Priority: P2  Unit CDU-1
+Equipment: P-101 (crude charge pump)
+Symptom: Mechanical seal weeping at drive end; small hydrocarbon drip.
+Action taken: Replaced mechanical seal cartridge. Vibration at close-out 5.8 mm/s (above OEM alarm 4.5 mm/s — trending upward again since March).
+Craft: S. Reddy. Status: Closed. Follow-up: schedule laser alignment check.

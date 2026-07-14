@@ -1,0 +1,6 @@
+WORK ORDER WO-2451  Priority: P2  Unit CDU-1
+Equipment: P-101 (crude charge pump)
+Reported by: R. Menon (Shift Operator)
+Symptom: Audible bearing noise and intermittent vibration alarm on VT-101 during high-throughput operation.
+Action taken: Greased drive-end bearing, cleaned vibration probe. Vibration reduced temporarily. Recommended trending. Craft: A. Khan (Mechanical Fitter).
+Status: Closed — temporary fix. Bearing not replaced.

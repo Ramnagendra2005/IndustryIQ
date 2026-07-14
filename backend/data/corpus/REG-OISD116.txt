@@ -1,0 +1,4 @@
+OISD-STD-116 — extract on rotating equipment integrity.
+Clause 5.4: Critical rotating equipment (charge pumps, compressors) shall be on a condition-monitoring programme with vibration surveys at intervals not exceeding 3 months.
+Clause 5.7: Trip and alarm settings shall be maintained per OEM and tested periodically.
+Clause 6.2: Records of surveys, alarm tests and corrective actions shall be retained and auditable.
