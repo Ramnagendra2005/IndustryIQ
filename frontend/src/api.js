@@ -1,8 +1,20 @@
 const BASE = import.meta.env.VITE_API_BASE || "";
 
 async function j(path, opts) {
-  const r = await fetch(BASE + path, opts);
-  if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+  let r;
+  try {
+    r = await fetch(BASE + path, opts);
+  } catch {
+    throw new Error("Cannot reach the IndustryIQ server — is the backend running?");
+  }
+  if (!r.ok) {
+    let msg = `Request failed (HTTP ${r.status})`;
+    try {
+      const d = await r.json();
+      msg = d.detail || d.error || msg;
+    } catch { /* non-JSON error body */ }
+    throw new Error(msg);
+  }
   return r.json();
 }
 

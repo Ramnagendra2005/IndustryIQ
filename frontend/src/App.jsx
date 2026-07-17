@@ -18,6 +18,7 @@ export default function App() {
   const [status, setStatus] = useState(null);
   const [tab, setTab] = useState(params.get("tab") || "graph");
   const [focus, setFocus] = useState(params.get("focus") || "P-101");
+  const [trail, setTrail] = useState([]); // evidence-trail hops from the last answer
   const [openDoc, setOpenDoc] = useState(null);
   const [field, setField] = useState(params.get("field") === "1");
   const [reloadKey, setReloadKey] = useState(0);
@@ -79,7 +80,7 @@ export default function App() {
         <div className="h-full flex flex-col md:flex-row">
           {/* chat */}
           <section className={`md:w-[46%] md:max-w-[560px] border-r border-edge min-h-0 flex-1 md:flex-none ${mobilePanel ? "hidden md:flex md:flex-col" : "flex flex-col"}`}>
-            <Chat onFocusEntity={focusEntity} onOpenDoc={openDocument} field={field} />
+            <Chat onFocusEntity={focusEntity} onOpenDoc={openDocument} onTrail={setTrail} field={field} />
           </section>
 
           {/* panels */}
@@ -95,7 +96,7 @@ export default function App() {
                 ))}
               </nav>
               <div className="flex-1 min-h-0">
-                {tab === "graph" && <GraphView focus={focus} onFocusEntity={focusEntity} key={"g" + reloadKey} />}
+                {tab === "graph" && <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} key={"g" + reloadKey} />}
                 {tab === "docs" && <Documents openId={openDoc} onClose={() => setOpenDoc(null)} key={"d" + reloadKey} />}
                 {tab === "compliance" && <Compliance onOpenDoc={openDocument} />}
                 {tab === "ingest" && <Ingest onIngested={() => setReloadKey((k) => k + 1)} />}
