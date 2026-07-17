@@ -76,7 +76,22 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field }) {
               Ask the plant's collective memory. The copilot fuses P&IDs, work orders,
               inspections, OEM manuals and incident history into one answer — with sources.
             </p>
-            <div className="mt-4 grid gap-2 max-w-md mx-auto">
+            {/* proactive alert — surfaces the cross-doc risk before anyone asks */}
+            <button
+              onClick={() => send("Why is pump P-101 vibrating and tripping?", "rca")}
+              className="mt-4 block w-full max-w-md mx-auto text-left rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 hover:border-red-400 transition"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold text-red-300">
+                <span className="w-2 h-2 rounded-full bg-red-400 live-dot" /> PROACTIVE ALERT
+              </div>
+              <div className="text-sm text-slate-100 mt-1">
+                P-101 vibration is at <span className="font-mono">5.8 mm/s</span> and trending toward the
+                OEM trip limit (<span className="font-mono">7.1 mm/s</span>) — sister pump <b>P-102</b> failed
+                catastrophically under this same signature in 2023.
+              </div>
+              <div className="text-xs text-red-300/80 mt-1">Tap to run root-cause analysis →</div>
+            </button>
+            <div className="mt-3 grid gap-2 max-w-md mx-auto">
               {SUGGESTIONS.map((s, i) => (
                 <button
                   key={i}
