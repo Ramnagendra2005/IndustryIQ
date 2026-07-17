@@ -547,4 +547,52 @@ SEED_ANSWERS = {
             "survey [DOC:INS-088] — i.e. into the trip region and ISO 10816 Zone D (unacceptable)."
         ),
     },
+    "downstream_p101": {
+        "triggers": ["connected downstream of p-101", "downstream equipment",
+                     "what is connected to p-101", "p-101 discharge", "process flow p-101",
+                     "upstream downstream"],
+        "answer": (
+            "Per the CDU-1 charge-pump-loop P&ID [DOC:PID-CDU1-002], the flow path from P-101 is:\n"
+            "• **Tank T-01** (crude feed) → suction header → **Pump P-101** → discharge →\n"
+            "• **Heat Exchanger E-204** (crude preheat) →\n"
+            "• **Distillation Column C-301** feed nozzle.\n\n"
+            "The identical standby pump **P-102** shares the same suction/discharge header, "
+            "cross-tied via valve MOV-114 — so a P-101 outage puts the full unit load on P-102. "
+            "Instrumentation on the loop: VT-101 (vibration) and TT-101 (temperature) on the "
+            "P-101 bearing housing, PT-204 on the E-204 shell outlet, PSV-301 on C-301."
+        ),
+    },
+    "oem_bearing_advice": {
+        "triggers": ["repeated bearing failures", "oem say about bearing", "bearing keeps failing",
+                     "short bearing life", "replace the bearing again", "bearing recommendation"],
+        "answer": (
+            "The OEM manual is explicit [DOC:OEM-KDP-P101]: **repeated short bearing life on the "
+            "KDP-300 indicates an external cause — misalignment, soft foot or unbalance — NOT "
+            "bearing quality.** The instruction is to investigate the installation, not simply "
+            "replace the bearing.\n\n"
+            "Specifically it requires: shaft alignment within **0.05 mm** cold parallel/angular "
+            "offset (excessive misalignment is the leading cause of premature bearing and seal "
+            "failure), and a **soft-foot check at every coupling service** — foot deflection over "
+            "0.05 mm must be corrected. The fitted bearing is an SKF 6312 C3 rated for 40,000 h "
+            "L10 life; P-101's bearings lasted ~2 months after the March change [DOC:WO-2478], "
+            "which by the OEM's own criterion points at the installation, matching the "
+            "misalignment signature in the May survey [DOC:INS-088]."
+        ),
+    },
+    "oisd_cadence": {
+        "triggers": ["vibration survey cadence", "oisd-116 require", "survey interval",
+                     "condition monitoring programme", "how often vibration survey",
+                     "are we meeting oisd"],
+        "answer": (
+            "**OISD-STD-116 Clause 5.4 requires vibration surveys at intervals not exceeding "
+            "3 months** for critical rotating equipment such as charge pumps [DOC:REG-OISD116].\n\n"
+            "We are **at risk of non-compliance**: the only formal survey on file for P-101 is the "
+            "May 2024 survey [DOC:INS-088]. Between the January bearing-noise work order "
+            "[DOC:WO-2451] and that May survey there is a ~4-month gap with no documented survey, "
+            "and no survey is scheduled since. Clause 6.2 also requires survey records to be "
+            "retained and auditable — the evidence pack for an audit is currently incomplete. "
+            "Recommended: put P-101/P-102 on a fixed quarterly survey schedule and log it against "
+            "the condition-monitoring programme."
+        ),
+    },
 }
