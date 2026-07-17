@@ -23,7 +23,7 @@
 │  └───────────────────┬──────────────────────┘                                          │
 │                      ▼                                                                  │
 │  ┌────────────── 2. EXTRACTION (LLM abstraction) ─────────────────────────────┐        │
-│  │  LiveClaude  : Claude structured-output + vision  → entities + relationships │        │
+│  │  LiveGemini  : Gemini structured-output + vision  → entities + relationships │        │
 │  │  SeedMock    : deterministic authored ground-truth (offline / air-gapped)    │        │
 │  └───────────────────┬─────────────────────────────────────────────────────────┘        │
 │           ┌──────────┴──────────┐                                                       │
@@ -77,11 +77,11 @@ This small, opinionated schema is what turns documents into a graph you can *rea
 
 ## 4. Dual-mode LLM abstraction
 
-Nothing outside `llm.py` imports `anthropic`. Two providers implement one interface:
+Nothing outside `llm.py` imports `google.genai`. Two providers implement one interface:
 
 | Provider    | Used for                              | Network | Notes                                   |
 |-------------|---------------------------------------|---------|-----------------------------------------|
-| `LiveClaude`| live ingestion + generative answers   | yes     | Claude structured output + vision       |
+| `LiveGemini`| live ingestion + generative answers   | yes     | Gemini structured output + vision       |
 | `SeedMock`  | offline demo / air-gapped sites       | no      | deterministic authored ground-truth     |
 
 `LLM_MODE=auto` selects live when an API key is present, else seed. This makes the demo
@@ -105,8 +105,8 @@ reliable *and* is a genuine product feature (offline capability for secure plant
 
 | Concern            | Choice                     | Why                                             |
 |--------------------|----------------------------|-------------------------------------------------|
-| LLM                | Claude (Sonnet/Opus)       | best entity/relationship extraction + reasoning |
-| Vision / OCR       | Claude vision              | digitises P&IDs / scanned forms — no tesseract  |
+| LLM                | Gemini (2.5 Flash)         | strong entity/relationship extraction + reasoning |
+| Vision / OCR       | Gemini vision              | digitises P&IDs / scanned forms — no tesseract  |
 | Graph              | NetworkX (Neo4j-ready)     | zero infra for the demo; clean upgrade path     |
 | Embeddings         | model2vec (static)         | torch-free, fast, runs anywhere incl. air-gapped|
 | Lexical            | rank-bm25                  | exact equipment-tag matching                    |

@@ -15,18 +15,18 @@ DATA_DIR = BACKEND_DIR / "data"
 CORPUS_DIR = DATA_DIR / "corpus"
 SEED_DIR = DATA_DIR / "seed"
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
 
 # Resolve LLM mode. "auto" => live when a key is present, else deterministic seed.
 _MODE = os.getenv("LLM_MODE", "auto").strip().lower()
 if _MODE == "auto":
-    LLM_MODE = "live" if ANTHROPIC_API_KEY else "seed"
+    LLM_MODE = "live" if GEMINI_API_KEY else "seed"
 else:
     LLM_MODE = _MODE
 
-ANSWER_MODEL = os.getenv("IIQ_ANSWER_MODEL", "claude-sonnet-5")
-EXTRACT_MODEL = os.getenv("IIQ_EXTRACT_MODEL", "claude-sonnet-5")
-VISION_MODEL = os.getenv("IIQ_VISION_MODEL", "claude-sonnet-5")
+ANSWER_MODEL = os.getenv("IIQ_ANSWER_MODEL", "gemini-2.5-flash")
+EXTRACT_MODEL = os.getenv("IIQ_EXTRACT_MODEL", "gemini-2.5-flash")
+VISION_MODEL = os.getenv("IIQ_VISION_MODEL", "gemini-2.5-flash")
 
 HOST = os.getenv("IIQ_HOST", "0.0.0.0")
 PORT = int(os.getenv("IIQ_PORT", "8000"))
@@ -39,7 +39,7 @@ def status() -> dict:
     """Small dict describing runtime config (safe to expose to the UI)."""
     return {
         "llm_mode": LLM_MODE,
-        "has_api_key": bool(ANTHROPIC_API_KEY),
+        "has_api_key": bool(GEMINI_API_KEY),
         "answer_model": ANSWER_MODEL,
         "extract_model": EXTRACT_MODEL,
         "vision_model": VISION_MODEL,

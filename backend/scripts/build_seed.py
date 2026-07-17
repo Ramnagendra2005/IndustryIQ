@@ -23,7 +23,7 @@ def main() -> None:
     extractions = {d["id"]: d["extraction"] for d in corpus_data.DOCS}
     payload = {"extractions": extractions, "answers": corpus_data.SEED_ANSWERS}
     out = SEED_DIR / "seed_llm.json"
-    out.write_text(json.dumps(payload, indent=2))
+    out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {out}  ({len(extractions)} extractions, {len(corpus_data.SEED_ANSWERS)} answers)")
 
 

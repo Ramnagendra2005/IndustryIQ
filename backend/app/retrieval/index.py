@@ -64,21 +64,25 @@ class HybridIndex:
         return self._model
 
     def build(self, documents: List[Document]) -> None:
-        self.passages = []
+        # Build into locals and swap at the end, so a search() running
+        # concurrently (e.g. during a live ingest) never sees a half-built index.
+        passages: List[Passage] = []
         for d in documents:
             for chunk in _chunk(d.text) or [d.title]:
-                self.passages.append(Passage(d.id, d.title, d.doc_type.value
-                                             if hasattr(d.doc_type, "value") else str(d.doc_type),
-                                             d.date, chunk))
-        if not self.passages:
+                passages.append(Passage(d.id, d.title, d.doc_type.value
+                                        if hasattr(d.doc_type, "value") else str(d.doc_type),
+                                        d.date, chunk))
+        if not passages:
+            self.passages = []
             return
-        tokenized = [_tokenize(p.text) for p in self.passages]
-        self._bm25 = BM25Okapi(tokenized)
+        tokenized = [_tokenize(p.text) for p in passages]
+        bm25 = BM25Okapi(tokenized)
         model = self._load_model()
-        self._embeds = model.encode([p.text for p in self.passages])
+        embeds = model.encode([p.text for p in passages])
         # normalise rows for cosine via dot product
-        norms = np.linalg.norm(self._embeds, axis=1, keepdims=True)
-        self._embeds = self._embeds / np.clip(norms, 1e-8, None)
+        norms = np.linalg.norm(embeds, axis=1, keepdims=True)
+        embeds = embeds / np.clip(norms, 1e-8, None)
+        self.passages, self._bm25, self._embeds = passages, bm25, embeds
 
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -88,14 +92,30 @@ class HybridIndex:
             return np.zeros_like(a)
         return (a - lo) / (hi - lo)
 
-    def search(self, query: str, k: int = 6, alpha: float = 0.5) -> List[tuple[Passage, float]]:
-        """Return top-k (passage, fused_score). alpha weights semantic vs lexical."""
-        if not self.passages:
-            return []
-        bm = np.array(self._bm25.get_scores(_tokenize(query)))
+    def max_cosine(self, query: str) -> float:
+        """Best absolute semantic similarity of the query to any passage.
+
+        Unlike search() scores (min-max normalised per query, so the top hit is
+        always 1.0), this is comparable across queries — used to detect
+        out-of-corpus questions before answering.
+        """
+        embeds = self._embeds
+        if embeds is None:
+            return 0.0
         qv = self._load_model().encode([query])[0]
         qv = qv / max(np.linalg.norm(qv), 1e-8)
-        sem = self._embeds @ qv
+        return float((embeds @ qv).max())
+
+    def search(self, query: str, k: int = 6, alpha: float = 0.5) -> List[tuple[Passage, float]]:
+        """Return top-k (passage, fused_score). alpha weights semantic vs lexical."""
+        # snapshot so a concurrent rebuild can't mismatch passages vs scores
+        passages, bm25, embeds = self.passages, self._bm25, self._embeds
+        if not passages or bm25 is None or embeds is None:
+            return []
+        bm = np.array(bm25.get_scores(_tokenize(query)))
+        qv = self._load_model().encode([query])[0]
+        qv = qv / max(np.linalg.norm(qv), 1e-8)
+        sem = embeds @ qv
         fused = alpha * self._minmax(sem) + (1 - alpha) * self._minmax(bm)
         order = np.argsort(-fused)[:k]
-        return [(self.passages[i], float(fused[i])) for i in order]
+        return [(passages[i], float(fused[i])) for i in order]

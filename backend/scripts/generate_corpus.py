@@ -25,7 +25,7 @@ def main() -> None:
     for d in corpus_data.DOCS:
         ext = _EXT.get(d["doc_type"], ".txt")
         path = CORPUS_DIR / f"{d['id']}{ext}"
-        path.write_text(d["text"])
+        path.write_text(d["text"], encoding="utf-8")
     print(f"wrote {len(corpus_data.DOCS)} corpus files to {CORPUS_DIR}")
 
 

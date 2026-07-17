@@ -16,17 +16,17 @@
 |---|---|
 | FastAPI backend (`backend/app/`) — engine, graph store (NetworkX), hybrid retrieval (BM25 + model2vec embeddings), GraphRAG fusion | ✅ Done |
 | Agents: Copilot / RCA (`app/agents/copilot.py`) + Compliance-gap (`app/agents/compliance.py`) | ✅ Done |
-| Dual-mode LLM abstraction (`app/llm.py`): `LiveClaude` (real API) vs `SeedMock` (deterministic offline), `LLM_MODE=auto` | ✅ Done |
+| Dual-mode LLM abstraction (`app/llm.py`): `LiveGemini` (real API) vs `SeedMock` (deterministic offline), `LLM_MODE=auto` | ✅ Done |
 | Synthetic-but-coherent corpus (P-101 vibration RCA story; sister pump **P-102** is the cross-doc payoff) — `backend/scripts/corpus_data.py`, `generate_corpus.py`, `build_seed.py` | ✅ Done |
 | React/Vite/Tailwind frontend — 5 tabs: **Chat, GraphView, Documents, Compliance, Ingest** | ✅ Done |
 | Docs: `README.md`, `ARCHITECTURE.md`, `docs/DEMO_SCRIPT.md`, `docs/PITCH_DECK.md`, `docs/BENCHMARK.md` | ✅ Written |
 | One-command run: `./run.sh` (build + serve on :8000), `./run.sh dev` (hot reload) | ✅ Done |
 
 **⚠️ Critical constraint every teammate must know:**
-The `ANTHROPIC_API_KEY` present in Ram's dev environment is **Claude-Code-restricted**
-— it returns *Access Denied* for direct SDK calls and **cannot power the app**.
-For live mode, someone must put a **personal `sk-ant-...` key** (from
-https://console.anthropic.com) into `.env` (`cp .env.example .env`).
+The `ANTHROPIC_API_KEY` in Ram's dev environment is **Claude-Code-restricted** and
+cannot power the app, so the live provider was **switched to Google Gemini**
+(`google-genai` SDK, free-tier key from https://aistudio.google.com/apikey).
+For live mode, put a **`GEMINI_API_KEY` (`AIza...`)** into `.env` (`cp .env.example .env`).
 Until then: develop and test with `LLM_MODE=seed` — the app is fully demoable offline.
 
 **Getting started (any machine):** follow README §Quickstart, then run `./run.sh`
@@ -40,18 +40,18 @@ and open http://localhost:8000. Ask the chat: *"Why is pump P-101 vibrating and 
 Goal: go from "prototype that works on Ram's machine in seed mode" to
 "robust app that works in **both** modes, on a clean machine, without embarrassing edge cases."
 
-### 2.1 Wire and verify LIVE Claude mode (highest priority) — ~half day
-- [ ] Obtain a personal Anthropic API key; put it in `.env`; confirm `LLM_MODE=auto` flips to live.
+### 2.1 Wire and verify LIVE Gemini mode (highest priority) — ~half day
+- [ ] Obtain a personal Gemini API key; put it in `.env`; confirm `LLM_MODE=auto` flips to live.
 - [ ] **Live copilot answers:** run every question in `docs/BENCHMARK.md` in live mode.
       Compare against seed answers. Fix prompt issues in `app/agents/copilot.py`
       (grounding, citation format, hallucination guardrails — the answer must cite
       real doc IDs from the retrieval context, never invented ones).
-- [ ] **Live ingestion showcase:** run live Claude extraction over the base corpus
+- [ ] **Live ingestion showcase:** run live Gemini extraction over the base corpus
       (entities + relationships) instead of only the authored seed extractions —
-      this is a judging differentiator ("real Claude built this graph").
+      this is a judging differentiator ("a real LLM built this graph").
       Keep the seed as fallback; never delete it.
 - [ ] **Live Ingest tab:** drop a real PDF and a scanned image (P&ID photo) —
-      verify Claude vision extraction lands correct nodes/edges in the graph.
+      verify Gemini vision extraction lands correct nodes/edges in the graph.
       Fix parser bugs in `app/ingestion/parsers.py`.
 - [ ] Add a small **mode badge in the UI** ("● Live" / "● Offline seed") so judges
       always know which mode they're seeing — turns the constraint into a feature.
@@ -160,7 +160,7 @@ Goal: zero new features. Only verification and packaging.
 
 | Workstream | Owner | Days |
 |---|---|---|
-| Live Claude mode + prompts (2.1) | ______ | 2 |
+| Live Gemini mode + prompts (2.1) | ______ | 2 |
 | Robustness + ingestion edge cases (2.2) | ______ | 2 |
 | Benchmark run + numbers (2.4) | ______ | 2 |
 | UI polish + GraphView evidence trail (3.1) | ______ | 3 |

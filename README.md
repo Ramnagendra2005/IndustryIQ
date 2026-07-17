@@ -28,7 +28,7 @@ knowledge graph + copilot** that connects the dots no single engineer can.
    breach*), and assembles an **audit-ready evidence pack** per requirement.
 
 3. **Universal Live Ingestion** — drop any PDF / scanned P&ID / spreadsheet / email
-   and watch Claude extract entities + relationships and fold them into the graph
+   and watch Gemini extract entities + relationships and fold them into the graph
    **live**, on any device.
 
 ---
@@ -38,7 +38,7 @@ knowledge graph + copilot** that connects the dots no single engineer can.
 ```
  React + Vite + Tailwind  ── Engineer dashboard + mobile Field copilot
         │  REST
- FastAPI ─ Engine ─┬─ Ingestion (PDF·image·xlsx·email·text  → Claude vision/structured extraction)
+ FastAPI ─ Engine ─┬─ Ingestion (PDF·image·xlsx·email·text  → Gemini vision/structured extraction)
                    ├─ Knowledge Graph (NetworkX, industrial ontology, entity resolution, path queries)
                    ├─ Hybrid Retrieval (BM25 + torch-free embeddings)  ─┐
                    ├─ GraphRAG fusion (vector seeds + graph traversal) ─┘
@@ -84,14 +84,14 @@ npm run dev            # http://localhost:5173
 
 Open **http://localhost:8000** (prod) or **http://localhost:5173** (dev).
 
-### 3. (Optional) Live Claude mode
+### 3. (Optional) Live Gemini mode
 IndustryIQ runs fully offline by default (deterministic seed). To enable **live**
 document ingestion + generative copilot answers, copy `.env.example` → `.env` and add
-your own Anthropic API key (`sk-ant-...` from https://console.anthropic.com):
+your own Google Gemini API key (`AIza...` from https://aistudio.google.com/apikey):
 
 ```bash
 cp .env.example .env
-# set ANTHROPIC_API_KEY=sk-ant-...   (LLM_MODE=auto flips to live automatically)
+# set GEMINI_API_KEY=AIza...   (LLM_MODE=auto flips to live automatically)
 ```
 
 > **Offline / air-gapped by design.** Because the app runs with zero external calls in

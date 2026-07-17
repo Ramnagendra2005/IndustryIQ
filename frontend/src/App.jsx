@@ -63,7 +63,7 @@ export default function App() {
           {status && (
             <span className="flex items-center gap-1.5 text-xs bg-panel2 border border-edge rounded-full px-2.5 py-1">
               <span className={`w-2 h-2 rounded-full ${status.llm_mode === "live" ? "bg-emerald-400" : "bg-teal live-dot"}`} />
-              <span className="text-slate-300">{status.llm_mode === "live" ? "Live Claude" : "Offline demo"}</span>
+              <span className="text-slate-300">{status.llm_mode === "live" ? "Live Gemini" : "Offline demo"}</span>
             </span>
           )}
           <div className="flex rounded-full bg-panel2 border border-edge p-0.5 text-xs">

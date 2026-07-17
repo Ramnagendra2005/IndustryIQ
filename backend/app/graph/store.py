@@ -227,7 +227,7 @@ class KnowledgeGraph:
     @classmethod
     def load(cls, path: Path) -> "KnowledgeGraph":
         kg = cls()
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         for n in data["nodes"]:
             key = n.pop("key")
             n["docs"] = set(n.get("docs", []))

@@ -38,6 +38,6 @@ targets a specific capability and metric. Run them live (RCA/Copilot modes) or v
 ## Notes on scoring
 - **Grounding:** every answer cites `[DOC:id]` sources; confidence reflects corroboration.
 - **Determinism:** in seed/offline mode the answers are fixed, so the benchmark is
-  reproducible on stage. In live mode Claude generates the same conclusions from the
+  reproducible on stage. In live mode Gemini generates the same conclusions from the
   retrieved context.
 - **Extend it:** add documents via the Ingest panel and add rows here to grow the set.

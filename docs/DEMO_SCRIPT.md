@@ -54,7 +54,7 @@ Point at the red gap:
 > **evidence pack** for the audit." Point at the OISD cadence **at-risk** item.
 
 ### 2:25 — Live ingestion + mobile (25s)
-Click **Ingest**, drop a document → *"watch Claude extract entities and relationships
+Click **Ingest**, drop a document → *"watch Gemini extract entities and relationships
 and fold them into the graph live."* Then toggle **📱 Field** in the header:
 > "And it's built for the technician on the plant floor, not just the engineer at a
 > desk — same brain, same citations, on a phone."

@@ -2,19 +2,18 @@
 
 Two providers behind one interface:
 
-  * LiveClaude  — calls the Anthropic API using the user's own key. Powers
+  * LiveGemini  — calls the Google Gemini API using the user's own key. Powers
                   live ingestion of newly-uploaded documents and copilot answers.
   * SeedMock    — deterministic, offline. Because we author the synthetic corpus,
                   we can pre-compute ground-truth extractions and hand-authored
                   answers, so the demo is bulletproof with no network / no key.
 
-The rest of the app never imports `anthropic` directly — it goes through
+The rest of the app never imports `google.genai` directly — it goes through
 `get_llm()` so the two modes are fully swappable. This is also the "works
 air-gapped for secure industrial sites" story for the pitch.
 """
 from __future__ import annotations
 
-import base64
 import json
 from pathlib import Path
 from typing import Optional
@@ -117,57 +116,60 @@ ANSWER_SYSTEM = (
 # --------------------------------------------------------------------------- #
 # Live provider
 # --------------------------------------------------------------------------- #
-class LiveClaude(BaseLLM):
-    name = "live-claude"
+class LiveGemini(BaseLLM):
+    name = "live-gemini"
     live = True
 
     def __init__(self) -> None:
-        import anthropic  # imported lazily so seed mode needs no network at all
+        from google import genai  # imported lazily so seed mode needs no network at all
 
-        self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        self._client = genai.Client(api_key=config.GEMINI_API_KEY)
 
-    def _structured(self, model: str, content, doc_hint: str) -> Extraction:
-        resp = self._client.messages.create(
+    def _structured(self, model: str, contents, doc_hint: str) -> Extraction:
+        from google.genai import types
+
+        resp = self._client.models.generate_content(
             model=model,
-            max_tokens=8000,
-            system=_EXTRACTION_SYSTEM,
-            output_config={"format": {"type": "json_schema", "schema": _EXTRACTION_SCHEMA}},
-            messages=[{"role": "user", "content": content}],
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_EXTRACTION_SYSTEM,
+                max_output_tokens=8000,
+                response_mime_type="application/json",
+                response_json_schema=_EXTRACTION_SCHEMA,
+            ),
         )
-        text = next((b.text for b in resp.content if b.type == "text"), "{}")
-        return Extraction.model_validate_json(text)
+        return Extraction.model_validate_json(resp.text or "{}")
 
     def extract(self, text: str, doc_hint: str = "") -> Extraction:
-        content = [{
-            "type": "text",
-            "text": f"Document type hint: {doc_hint}\n\n---\n{text[:60000]}",
-        }]
-        return self._structured(config.EXTRACT_MODEL, content, doc_hint)
+        contents = f"Document type hint: {doc_hint}\n\n---\n{text[:60000]}"
+        return self._structured(config.EXTRACT_MODEL, contents, doc_hint)
 
     def extract_image(self, image_bytes: bytes, media_type: str, doc_hint: str = "") -> Extraction:
-        b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
-        content = [
-            {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
-            {"type": "text", "text": (
+        from google.genai import types
+
+        contents = [
+            types.Part.from_bytes(data=image_bytes, mime_type=media_type),
+            (
                 f"This is an industrial {doc_hint} (e.g. a P&ID or scanned inspection form). "
                 "Read every equipment tag, connection, parameter and note. Digitise it into "
                 "the knowledge-graph schema — connections between equipment are CONNECTED_TO "
                 "relations."
-            )},
+            ),
         ]
-        return self._structured(config.VISION_MODEL, content, doc_hint)
+        return self._structured(config.VISION_MODEL, contents, doc_hint)
 
     def answer(self, system: str, question: str, context: str) -> str:
-        resp = self._client.messages.create(
+        from google.genai import types
+
+        resp = self._client.models.generate_content(
             model=config.ANSWER_MODEL,
-            max_tokens=2000,
-            system=system,
-            messages=[{
-                "role": "user",
-                "content": f"CONTEXT FROM PLANT KNOWLEDGE BASE:\n{context}\n\n---\nQUESTION: {question}",
-            }],
+            contents=f"CONTEXT FROM PLANT KNOWLEDGE BASE:\n{context}\n\n---\nQUESTION: {question}",
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                max_output_tokens=2000,
+            ),
         )
-        return next((b.text for b in resp.content if b.type == "text"), "")
+        return resp.text or ""
 
 
 # --------------------------------------------------------------------------- #
@@ -189,7 +191,7 @@ class SeedMock(BaseLLM):
         self._answers: dict[str, dict] = {}
         path = seed_path or (config.SEED_DIR / "seed_llm.json")
         if path.exists():
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             self._extractions = data.get("extractions", {})
             self._answers = data.get("answers", {})
 
@@ -280,7 +282,7 @@ def _extractive_answer(question: str, context: str) -> str:
     top = [b for _, b in scored[:5]]
     return ("Based on the retrieved plant records:\n\n" + "\n".join(f"• {b}" for b in top) +
             "\n\n(Offline mode: this is an extractive summary of the source documents. "
-            "Provide an ANTHROPIC_API_KEY for full generative reasoning.)")
+            "Provide a GEMINI_API_KEY for full generative reasoning.)")
 
 
 # type alias only for annotation clarity above
@@ -299,7 +301,7 @@ def get_llm() -> BaseLLM:
         return _INSTANCE
     if config.LLM_MODE == "live":
         try:
-            _INSTANCE = LiveClaude()
+            _INSTANCE = LiveGemini()
         except Exception as exc:  # pragma: no cover - fall back rather than crash
             print(f"[llm] live init failed ({exc}); falling back to seed mode")
             _INSTANCE = SeedMock()

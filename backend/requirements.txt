@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-anthropic
+google-genai
 pydantic
 python-multipart
 networkx

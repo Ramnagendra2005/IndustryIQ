@@ -3,7 +3,7 @@
 Turns an uploaded file (PDF, scanned image / P&ID, spreadsheet, email, text)
 into a normalized Document plus the payload the extractor needs:
   * text documents  -> ("text", <string>)
-  * images/P&IDs    -> ("image", (<bytes>, <media_type>))   [parsed via Claude vision]
+  * images/P&IDs    -> ("image", (<bytes>, <media_type>))   [parsed via Gemini vision]
 """
 from __future__ import annotations
 
