@@ -13,8 +13,24 @@ const LINK_TINT = {
 };
 const LINK_DEFAULT = "rgba(42, 58, 92, 0.7)";
 
-export default function GraphView({ focus, trail = [], onFocusEntity }) {
-  const [data, setData] = useState({ nodes: [], links: [] });
+// Tab switches unmount this component (AnimatePresence). Cache the fetched
+// graph AND the simulation-positioned node objects per focus, so coming back
+// paints instantly with the settled layout instead of refetch + re-warmup.
+// version (= App reloadKey) invalidates the cache after an ingest.
+const graphCache = new Map();
+let cacheVersion = null;
+function cacheFor(version) {
+  if (version !== cacheVersion) {
+    graphCache.clear();
+    cacheVersion = version;
+  }
+  return graphCache;
+}
+
+export default function GraphView({ focus, trail = [], onFocusEntity, version = 0 }) {
+  const cache = cacheFor(version);
+  const cacheKey = focus || "__all__";
+  const [data, setData] = useState(() => cache.get(cacheKey)?.data || { nodes: [], links: [] });
   const [dims, setDims] = useState({ w: 600, h: 500 });
   const [hoverType, setHoverType] = useState(null);
   const wrapRef = useRef(null);
@@ -23,17 +39,27 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
   hoverTypeRef.current = hoverType;
 
   useEffect(() => {
-    api.graph(focus || null, 2).then(setData).catch(() => {});
-  }, [focus]);
+    const hit = cache.get(cacheKey);
+    if (hit) {
+      setData(hit.data);
+      return;
+    }
+    api.graph(focus || null, 2).then((d) => {
+      cache.set(cacheKey, { data: d });
+      setData(d);
+    }).catch(() => {});
+  }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // spread the layout out so labels are readable
+  // spread the layout out so labels are readable (skip when restoring an
+  // already-settled cached layout — reheating would make it wobble)
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
     fg.d3Force("charge")?.strength(-220);
     fg.d3Force("link")?.distance(70);
-    fg.d3ReheatSimulation?.();
-  }, [data]);
+    const positioned = cache.get(cacheKey)?.positioned;
+    if (typeof positioned?.nodes[0]?.x !== "number") fg.d3ReheatSimulation?.();
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -65,11 +91,18 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
   const onTrailLink = (l) => trailEdges.has(`${linkId(l.source)}|${linkId(l.target)}`);
 
   const graph = useMemo(() => {
-    return {
+    const hit = cache.get(cacheKey);
+    if (hit?.positioned) return hit.positioned; // settled layout from a previous visit
+    const g = {
       nodes: data.nodes.map((n) => ({ ...n })),
       links: data.links.map((l) => ({ ...l })),
     };
-  }, [data]);
+    if (hit) hit.positioned = g; // the simulation mutates x/y into these objects
+    return g;
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // cached layouts are already settled — skip warmup and finish instantly
+  const settled = typeof graph.nodes[0]?.x === "number";
 
   const typeCounts = useMemo(() => {
     const s = {};
@@ -99,8 +132,8 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
           height={dims.h}
           graphData={graph}
           backgroundColor="rgba(0,0,0,0)"
-          warmupTicks={120}
-          cooldownTicks={120}
+          warmupTicks={settled ? 0 : 120}
+          cooldownTicks={settled ? 0 : 120}
           d3VelocityDecay={0.3}
           onEngineStop={() => fgRef.current?.zoomToFit(500, 60)}
           nodeRelSize={5}
@@ -114,6 +147,10 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
           linkDirectionalArrowRelPos={1}
           onNodeClick={(n) => onFocusEntity?.(n.label)}
           nodeCanvasObject={(node, ctx, scale) => {
+            // during a data swap the first frame can arrive before the
+            // simulation has placed the node — drawing with non-finite
+            // coords throws in createRadialGradient and blanks the canvas
+            if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
             const color = TYPE_COLORS[node.type] || "#64748b";
             const onTrail = trailNodes.has(node.id);
             const dimmed = hoverTypeRef.current && node.type !== hoverTypeRef.current && !onTrail;

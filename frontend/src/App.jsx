@@ -161,7 +161,7 @@ export default function App() {
                     transition={{ duration: 0.2, ease: "easeOut" }}
                     className="absolute inset-0"
                   >
-                    {tab === "graph" && <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} key={"g" + reloadKey} />}
+                    {tab === "graph" && <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} version={reloadKey} key={"g" + reloadKey} />}
                     {tab === "docs" && <Documents openId={openDoc} onClose={() => setOpenDoc(null)} key={"d" + reloadKey} />}
                     {tab === "compliance" && <Compliance onOpenDoc={openDocument} />}
                     {tab === "trust" && <Trust onOpenDoc={openDocument} key={"t" + reloadKey} />}
