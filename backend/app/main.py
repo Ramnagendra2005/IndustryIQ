@@ -41,6 +41,11 @@ def compliance(scope: str = "Unit CDU-1 charge pumps"):
     return get_engine().compliance(scope).model_dump()
 
 
+@app.get("/api/trust")
+def trust():
+    return get_engine().trust().model_dump()
+
+
 @app.get("/api/graph")
 def graph(focus: str | None = None, radius: int = 2):
     return get_engine().graph_view(focus, radius)

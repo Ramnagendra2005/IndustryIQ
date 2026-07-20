@@ -2,12 +2,25 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import { api } from "../api";
 import { TYPE_COLORS } from "../lib";
+import { CountUp } from "../fx";
+
+const LINK_TINT = {
+  SIBLING_OF: "rgba(251, 191, 36, 0.45)",
+  CONNECTED_TO: "rgba(56, 189, 248, 0.4)",
+  HAS_FAILURE: "rgba(248, 113, 113, 0.35)",
+  GOVERNED_BY: "rgba(45, 212, 191, 0.3)",
+  DOCUMENTED_IN: "rgba(148, 163, 184, 0.22)",
+};
+const LINK_DEFAULT = "rgba(42, 58, 92, 0.7)";
 
 export default function GraphView({ focus, trail = [], onFocusEntity }) {
   const [data, setData] = useState({ nodes: [], links: [] });
   const [dims, setDims] = useState({ w: 600, h: 500 });
+  const [hoverType, setHoverType] = useState(null);
   const wrapRef = useRef(null);
   const fgRef = useRef(null);
+  const hoverTypeRef = useRef(null);
+  hoverTypeRef.current = hoverType;
 
   useEffect(() => {
     api.graph(focus || null, 2).then(setData).catch(() => {});
@@ -58,30 +71,26 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
     };
   }, [data]);
 
-  const types = useMemo(() => {
+  const typeCounts = useMemo(() => {
     const s = {};
     data.nodes.forEach((n) => (s[n.type] = (s[n.type] || 0) + 1));
-    return Object.keys(s).sort();
+    return s;
   }, [data]);
+  const types = useMemo(() => Object.keys(typeCounts).sort(), [typeCounts]);
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-edge text-xs">
-        <span className="text-slate-400">{graph.nodes.length} entities · {graph.links.length} relationships</span>
+      <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-edge text-xs shrink-0">
+        <span className="text-slate-400 font-mono">
+          <CountUp value={graph.nodes.length} className="text-white" /> entities ·{" "}
+          <CountUp value={graph.links.length} className="text-white" /> relationships
+        </span>
         {trailNodes.size > 0 && (
-          <span className="flex items-center gap-1.5 bg-amber-400/10 border border-amber-400/40 text-amber-300 rounded-full px-2 py-0.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 live-dot" />
-            evidence trail from last answer
+          <span className="flex items-center gap-1.5 bg-amber/10 border border-amber/40 text-amber rounded-full px-2.5 py-0.5 font-mono text-[11px] tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-amber live-dot" />
+            EVIDENCE TRAIL ACTIVE
           </span>
         )}
-        <span className="ml-auto flex flex-wrap gap-2">
-          {types.map((t) => (
-            <span key={t} className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: TYPE_COLORS[t] || "#64748b" }} />
-              <span className="text-slate-300">{t}</span>
-            </span>
-          ))}
-        </span>
       </div>
       <div ref={wrapRef} className="flex-1 relative">
         <ForceGraph2D
@@ -89,16 +98,17 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
           width={dims.w}
           height={dims.h}
           graphData={graph}
-          backgroundColor="#0b1220"
+          backgroundColor="rgba(0,0,0,0)"
           warmupTicks={120}
           cooldownTicks={120}
           d3VelocityDecay={0.3}
           onEngineStop={() => fgRef.current?.zoomToFit(500, 60)}
           nodeRelSize={5}
-          linkColor={(l) => (onTrailLink(l) ? "#fbbf24" : "#2a3a5c")}
+          linkColor={(l) => (onTrailLink(l) ? "#fbbf24" : LINK_TINT[l.type] || LINK_DEFAULT)}
           linkWidth={(l) => (onTrailLink(l) ? 3 : l.type === "SIBLING_OF" || l.type === "CONNECTED_TO" ? 2 : 1)}
-          linkDirectionalParticles={(l) => (onTrailLink(l) ? 3 : 0)}
-          linkDirectionalParticleWidth={3}
+          linkDirectionalParticles={(l) => (onTrailLink(l) ? 4 : 0)}
+          linkDirectionalParticleWidth={3.5}
+          linkDirectionalParticleSpeed={0.012}
           linkDirectionalParticleColor={() => "#fbbf24"}
           linkDirectionalArrowLength={3}
           linkDirectionalArrowRelPos={1}
@@ -106,32 +116,85 @@ export default function GraphView({ focus, trail = [], onFocusEntity }) {
           nodeCanvasObject={(node, ctx, scale) => {
             const color = TYPE_COLORS[node.type] || "#64748b";
             const onTrail = trailNodes.has(node.id);
+            const dimmed = hoverTypeRef.current && node.type !== hoverTypeRef.current && !onTrail;
             const r = (node.highlight || onTrail ? 7 : 4 + Math.min(node.mentions || 1, 4)) / 1;
+
+            ctx.globalAlpha = dimmed ? 0.15 : 1;
+
+            // soft color-matched glow behind every node (depth + atmosphere)
+            const glowR = r * 2.6;
+            const grad = ctx.createRadialGradient(node.x, node.y, r * 0.4, node.x, node.y, glowR);
+            grad.addColorStop(0, color + (onTrail || node.highlight ? "55" : "2e"));
+            grad.addColorStop(1, color + "00");
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, glowR, 0, 2 * Math.PI);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
             if (onTrail) {
-              // amber halo so the whole evidence path pops
+              // pulsing amber halo so the whole evidence path breathes
+              const pulse = 3 + Math.sin(performance.now() / 300) * 1.6;
               ctx.beginPath();
-              ctx.arc(node.x, node.y, r + 3.5, 0, 2 * Math.PI);
-              ctx.fillStyle = "rgba(251, 191, 36, 0.25)";
+              ctx.arc(node.x, node.y, r + pulse, 0, 2 * Math.PI);
+              ctx.fillStyle = "rgba(251, 191, 36, 0.22)";
               ctx.fill();
             }
+
+            // node body: bright core + darker rim for depth
             ctx.beginPath();
             ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
             ctx.fillStyle = color;
             ctx.fill();
+            ctx.beginPath();
+            ctx.arc(node.x - r * 0.25, node.y - r * 0.25, r * 0.45, 0, 2 * Math.PI);
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.fill();
+
             if (node.highlight || onTrail) {
               ctx.lineWidth = 2;
               ctx.strokeStyle = onTrail ? "#fbbf24" : "#ffffff";
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
               ctx.stroke();
             }
+
             const label = node.label;
             const fs = Math.max(10 / scale, 3);
-            ctx.font = `${node.highlight ? "bold " : ""}${fs}px ui-monospace, monospace`;
+            ctx.font = `${node.highlight ? "700 " : "500 "}${fs}px "JetBrains Mono", ui-monospace, monospace`;
+            // dark backing shadow so labels stay readable over the grid
+            ctx.shadowColor = "rgba(7, 11, 20, 0.9)";
+            ctx.shadowBlur = 4;
             ctx.fillStyle = node.highlight ? "#ffffff" : "#93a4c3";
             ctx.textAlign = "center";
             ctx.fillText(label, node.x, node.y + r + fs + 1);
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
           }}
         />
-        <div className="absolute bottom-2 left-2 text-[10px] text-slate-500 bg-ink/70 rounded px-2 py-1">
+
+        {/* floating glass legend — hover a type to isolate it */}
+        <div className="absolute bottom-3 right-3 glass-strong rounded-xl px-3 py-2.5 max-w-[190px]">
+          <div className="text-[10px] text-slate-400 font-mono tracking-widest mb-1.5">ONTOLOGY</div>
+          <div className="space-y-1">
+            {types.map((t) => (
+              <div
+                key={t}
+                onMouseEnter={() => setHoverType(t)}
+                onMouseLeave={() => setHoverType(null)}
+                className={`flex items-center gap-2 text-[11px] cursor-default rounded px-1 -mx-1 transition-colors ${hoverType === t ? "bg-panel2" : ""}`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ background: TYPE_COLORS[t] || "#64748b", boxShadow: `0 0 6px ${TYPE_COLORS[t] || "#64748b"}88` }}
+                />
+                <span className="text-slate-300 truncate">{t}</span>
+                <span className="ml-auto font-mono text-slate-500">{typeCounts[t]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="absolute bottom-3 left-3 text-[10px] text-slate-500 glass rounded-lg px-2 py-1 font-mono">
           click a node to focus · drag to explore
         </div>
       </div>

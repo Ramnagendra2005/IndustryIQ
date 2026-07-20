@@ -14,19 +14,6 @@ export const TYPE_COLORS = {
   Unknown: "#64748b",
 };
 
-export const DOCTYPE_ICON = {
-  "P&ID": "🗺️",
-  WorkOrder: "🔧",
-  InspectionReport: "🔍",
-  OEMManual: "📘",
-  IncidentReport: "🚨",
-  SOP: "📋",
-  RegulatoryDocument: "⚖️",
-  Spreadsheet: "📊",
-  Email: "✉️",
-  Other: "📄",
-};
-
 /**
  * Ultra-light markdown: **bold**, bullet lines starting with •/-, and
  * [DOC:id] chips (rendered via onCite callback).
@@ -71,8 +58,9 @@ function renderInline(text, onCite) {
         <button
           key={k++}
           onClick={() => onCite && onCite(id)}
-          className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded bg-teal/15 text-teal text-xs font-mono hover:bg-teal/30 align-baseline"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-teal/10 border border-teal/25 text-teal text-xs font-mono hover:bg-teal/25 hover:shadow-glow-teal transition-all align-baseline"
         >
+          <span className="w-1 h-1 rounded-full bg-teal" />
           {id}
         </button>
       );

@@ -27,6 +27,7 @@ export const api = {
       body: JSON.stringify({ question, mode }),
     }),
   compliance: () => j("/api/compliance"),
+  trust: () => j("/api/trust"),
   graph: (focus, radius = 2) =>
     j(`/api/graph${focus ? `?focus=${encodeURIComponent(focus)}&radius=${radius}` : ""}`),
   documents: () => j("/api/documents"),

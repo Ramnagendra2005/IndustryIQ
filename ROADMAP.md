@@ -160,6 +160,39 @@ Goal: zero new features. Only verification and packaging.
 
 ---
 
+## Phase 2 (2026-07-20 →) — Differentiator features
+
+> The five suggested build areas are what every team will build. These features
+> attack the parts of the problem statement everyone else ignores — the
+> knowledge cliff and answer trust. Build order agreed: one at a time, verify,
+> then next.
+
+- [x] **1. Trust Layer — contradiction & staleness detection** (2026-07-20)
+      `app/agents/trust.py` + `/api/trust` + Trust tab + trust strip on every answer.
+      * Freshness: every doc scores 0..1, decaying by doc-type half-life against
+        the **corpus clock** (newest evidence date — deterministic, moves on ingest).
+        Incident reports & statutes are evergreen (lessons/law don't expire).
+      * Conflict detectors (generic regex/graph scanners, run on ingested docs too):
+        numeric setpoint disagreement (OEM trip 7.1 vs WO-2478's 7.0 mm/s),
+        SOP acceptance breach (WO-2502 closed at 5.8 mm/s vs SOP-CDU-07 "do not
+        accept > 4.5"), doc-vs-reality (coupling guard required but documented OFF),
+        stale drawing (2019 P&ID pre-dates 4 maintenance events).
+      * Every copilot answer now carries `trust`: worst-source freshness +
+        warnings when cited docs are conflicted/stale (Chat shows amber TRUST CHECK).
+      * Verified: seed mode intact (0.98 conf RCA + trust), live mode works,
+        off-topic refusal unaffected, `/api/trust` ~5 ms.
+- [ ] **2. Tacit Knowledge Capture ("Exit Interview AI")** — structured interview
+      agent for retiring experts → knowledge entries linked to equipment tags,
+      contradiction check against SOPs via the Trust Layer.
+- [ ] **3. Interactive P&ID** — clickable schematic as the navigation layer;
+      tap a pump → full dossier (history, failure modes, procedures, gaps).
+- [ ] **4. Proactive push on work-order ingest** — new WO for equipment X
+      auto-attaches similar failures, lessons learned, permits, draft JSA.
+- [ ] **5. Live metrics dashboard** — in-app benchmark panel (accuracy,
+      time-to-answer, abstention) instead of only `docs/BENCHMARK.md`.
+
+---
+
 ## Ownership template (fill in when the team divides work)
 
 | Workstream | Owner | Days |

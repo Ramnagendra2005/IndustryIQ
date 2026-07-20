@@ -115,6 +115,14 @@ class QueryRequest(BaseModel):
     mode: str = "copilot"       # copilot | rca | compliance
 
 
+class AnswerTrust(BaseModel):
+    """Trust-layer annotation attached to every answer: how fresh are the
+    sources behind it, and do any of them carry known conflicts?"""
+    freshness: float            # 0..1 — worst freshness among cited sources
+    stale_docs: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
 class QueryResponse(BaseModel):
     answer: str
     confidence: float           # 0..1
@@ -123,6 +131,7 @@ class QueryResponse(BaseModel):
     focus_entities: List[str] = Field(default_factory=list)
     elapsed_ms: int = 0
     mode: str = "copilot"
+    trust: Optional[AnswerTrust] = None
 
 
 class ComplianceGap(BaseModel):
@@ -139,4 +148,37 @@ class ComplianceReport(BaseModel):
     gaps: List[ComplianceGap] = Field(default_factory=list)
     met: List[ComplianceGap] = Field(default_factory=list)
     readiness_score: float = 0.0
+    elapsed_ms: int = 0
+
+
+# --------------------------------------------------------------------------- #
+# Trust layer — contradiction & staleness detection
+# --------------------------------------------------------------------------- #
+class DocFreshness(BaseModel):
+    doc_id: str
+    title: str
+    doc_type: str
+    date: Optional[str] = None
+    age_days: Optional[int] = None
+    freshness: float            # 0..1 (1 = fresh, decays by doc-type half-life)
+    status: str = "fresh"       # fresh | aging | stale
+    note: str = ""
+
+
+class Conflict(BaseModel):
+    id: str
+    kind: str                   # numeric_conflict | doc_vs_reality | stale_reference | version_conflict
+    severity: str               # low | medium | high
+    title: str
+    detail: str
+    doc_ids: List[str] = Field(default_factory=list)
+    entities: List[str] = Field(default_factory=list)
+
+
+class TrustReport(BaseModel):
+    corpus_health: float        # 0..1 aggregate trust score for the corpus
+    conflicts: List[Conflict] = Field(default_factory=list)
+    freshness: List[DocFreshness] = Field(default_factory=list)
+    stale_count: int = 0
+    aging_count: int = 0
     elapsed_ms: int = 0

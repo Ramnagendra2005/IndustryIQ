@@ -14,11 +14,12 @@ from typing import Optional
 from . import config
 from .agents.compliance import run_compliance
 from .agents.copilot import run_copilot
+from .agents.trust import annotate_answer, run_trust
 from .graph.store import KnowledgeGraph
 from .ingestion.parsers import parse_upload
 from .llm import SeedMock, get_llm
 from .retrieval.index import HybridIndex
-from .schemas import ComplianceReport, Document, Extraction, QueryResponse
+from .schemas import ComplianceReport, Document, Extraction, QueryResponse, TrustReport
 
 # make backend/scripts importable for the authored corpus
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -32,6 +33,7 @@ class Engine:
         self._ready = False
         self._ingest_lock = threading.Lock()
         self._seed_fallback: Optional[SeedMock] = None
+        self._trust_cache: Optional[TrustReport] = None
 
     def _fallback_llm(self) -> SeedMock:
         """Offline provider used when a live API call fails mid-request."""
@@ -71,17 +73,25 @@ class Engine:
 
     def answer(self, question: str, mode: str = "copilot") -> QueryResponse:
         try:
-            return run_copilot(self.kg, self.index, self.llm, question, mode)
+            resp = run_copilot(self.kg, self.index, self.llm, question, mode)
         except Exception as exc:
             if not self.llm.live:
                 raise
             print(f"[engine] live answer failed ({exc}); retrying in offline seed mode")
             resp = run_copilot(self.kg, self.index, self._fallback_llm(), question, mode)
             resp.answer += "\n\n_(Live API unavailable — this answer was generated offline.)_"
-            return resp
+        if resp.citations:
+            resp.trust = annotate_answer(self.kg, resp.citations, self.trust())
+        return resp
 
     def compliance(self, scope: str = "Unit CDU-1 charge pumps") -> ComplianceReport:
         return run_compliance(self.kg, self.index, scope)
+
+    def trust(self) -> TrustReport:
+        """Corpus-wide trust report; cached until the corpus changes."""
+        if self._trust_cache is None:
+            self._trust_cache = run_trust(self.kg)
+        return self._trust_cache
 
     def graph_view(self, focus: Optional[str] = None, radius: int = 2) -> dict:
         focus_list = [f.strip() for f in focus.split(",")] if focus else None
@@ -152,6 +162,7 @@ class Engine:
             self.kg.ingest_extraction(doc, extraction)
             self.index.build(self.kg.documents())
             after = self.kg.stats()
+            self._trust_cache = None  # corpus changed — recompute trust lazily
 
         return {
             "document": {
