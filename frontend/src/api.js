@@ -20,11 +20,11 @@ async function j(path, opts) {
 
 export const api = {
   status: () => j("/api/status"),
-  query: (question, mode) =>
+  query: (question, mode, lang = "en") =>
     j("/api/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, mode }),
+      body: JSON.stringify({ question, mode, lang }),
     }),
   compliance: () => j("/api/compliance"),
   trust: () => j("/api/trust"),

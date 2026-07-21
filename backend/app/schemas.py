@@ -113,6 +113,7 @@ class GraphPathHop(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     mode: str = "copilot"       # copilot | rca | compliance
+    lang: str = "en"            # answer language (ISO 639-1): en | hi | te | ta | kn | mr | bn
 
 
 class AnswerTrust(BaseModel):

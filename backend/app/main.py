@@ -33,7 +33,7 @@ def status():
 
 @app.post("/api/query")
 def query(req: QueryRequest):
-    return get_engine().answer(req.question, req.mode).model_dump()
+    return get_engine().answer(req.question, req.mode, req.lang).model_dump()
 
 
 @app.get("/api/compliance")
