@@ -7,10 +7,12 @@ import Documents from "./components/Documents";
 import Compliance from "./components/Compliance";
 import Trust from "./components/Trust";
 import Ingest from "./components/Ingest";
+import PID from "./components/PID";
 import { CountUp } from "./fx";
-import { IconGraph, IconDocs, IconShield, IconUpload, IconChat, IconDesktop, IconField, IconConflict } from "./icons";
+import { IconGraph, IconDocs, IconShield, IconUpload, IconChat, IconDesktop, IconField, IconConflict, IconMap } from "./icons";
 
 const TABS = [
+  { id: "pid", label: "P&ID", Icon: IconMap },
   { id: "graph", label: "Knowledge Graph", Icon: IconGraph },
   { id: "docs", label: "Documents", Icon: IconDocs },
   { id: "compliance", label: "Compliance", Icon: IconShield },
@@ -27,6 +29,7 @@ export default function App() {
   const [openDoc, setOpenDoc] = useState(null);
   const [field, setField] = useState(params.get("field") === "1");
   const [reloadKey, setReloadKey] = useState(0);
+  const [ask, setAsk] = useState(null); // {q, mode, nonce} bridge: dossier → chat
   const [mobilePanel, setMobilePanel] = useState(params.has("tab")); // mobile: show panels vs chat
   const [booted, setBooted] = useState(() => sessionStorage.getItem("iq-booted") === "1");
 
@@ -40,6 +43,10 @@ export default function App() {
   function focusEntity(e) {
     setFocus(e);
     setTab("graph");
+  }
+  function askCopilot(q, mode = "copilot") {
+    setAsk({ q, mode, nonce: Date.now() });
+    setMobilePanel(false); // mobile: reveal the chat column
   }
   function finishBoot() {
     sessionStorage.setItem("iq-booted", "1");
@@ -120,7 +127,7 @@ export default function App() {
             transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
             className={`md:w-[46%] md:max-w-[560px] border-r border-edge min-h-0 flex-1 md:flex-none ${mobilePanel ? "hidden md:flex md:flex-col" : "flex flex-col"}`}
           >
-            <Chat onFocusEntity={focusEntity} onOpenDoc={openDocument} onTrail={setTrail} field={field} />
+            <Chat onFocusEntity={focusEntity} onOpenDoc={openDocument} onTrail={setTrail} field={field} ask={ask} />
           </motion.section>
 
           {/* panels */}
@@ -161,6 +168,7 @@ export default function App() {
                     transition={{ duration: 0.2, ease: "easeOut" }}
                     className="absolute inset-0"
                   >
+                    {tab === "pid" && <PID onOpenDoc={openDocument} onAsk={askCopilot} onFocusEntity={focusEntity} key={"p" + reloadKey} />}
                     {tab === "graph" && <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} version={reloadKey} key={"g" + reloadKey} />}
                     {tab === "docs" && <Documents openId={openDoc} onClose={() => setOpenDoc(null)} key={"d" + reloadKey} />}
                     {tab === "compliance" && <Compliance onOpenDoc={openDocument} />}
@@ -180,8 +188,8 @@ export default function App() {
           <button onClick={() => setMobilePanel(false)} className={`flex-1 py-2 text-xs flex items-center justify-center gap-1.5 ${!mobilePanel ? "text-accent" : "text-slate-400"}`}>
             <IconChat className="w-4 h-4" /> Copilot
           </button>
-          <button onClick={() => { setMobilePanel(true); setTab("graph"); }} className={`flex-1 py-2 text-xs flex items-center justify-center gap-1.5 ${mobilePanel ? "text-accent" : "text-slate-400"}`}>
-            <IconGraph className="w-4 h-4" /> Explore
+          <button onClick={() => { setMobilePanel(true); setTab("pid"); }} className={`flex-1 py-2 text-xs flex items-center justify-center gap-1.5 ${mobilePanel ? "text-accent" : "text-slate-400"}`}>
+            <IconMap className="w-4 h-4" /> Explore
           </button>
         </nav>
       )}

@@ -32,6 +32,10 @@ export const api = {
     j(`/api/graph${focus ? `?focus=${encodeURIComponent(focus)}&radius=${radius}` : ""}`),
   documents: () => j("/api/documents"),
   document: (id) => j(`/api/documents/${id}`),
+  pids: () => j("/api/pids"),
+  pid: (id) => j(`/api/pid/${encodeURIComponent(id)}`),
+  pidImageUrl: (id) => `${BASE}/api/pid/${encodeURIComponent(id)}/image`,
+  entity: (name) => j(`/api/entity/${encodeURIComponent(name)}`),
   ingest: (file) => {
     const fd = new FormData();
     fd.append("file", file);

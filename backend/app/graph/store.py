@@ -111,6 +111,75 @@ class KnowledgeGraph:
                         out.append(d)
         return out
 
+    def node_view(self, key: str) -> Optional[dict]:
+        """Resolved snapshot of one node (type/label/description/docs), or None."""
+        k = self._resolve_key(key) or (key if key in self.g else None)
+        if not k or k not in self.g:
+            return None
+        n = self.g.nodes[k]
+        return {
+            "key": k,
+            "label": n.get("label", k),
+            "type": n.get("type", "Unknown"),
+            "description": n.get("description", ""),
+            "mentions": n.get("mentions", 1),
+            "docs": sorted(n.get("docs", set())),
+        }
+
+    def relations_of(self, key: str) -> List[dict]:
+        """Every typed edge touching `key`, normalized to a direction-aware view.
+
+        Each item: {relation, direction ('out'|'in'), other (canonical key),
+        label, type (of the other node), evidence, doc_id}. Direction lets the
+        dossier tell "P-101 CONNECTED_TO E-204" (downstream) apart from
+        "T-01 CONNECTED_TO P-101" (upstream) even though both touch P-101.
+        """
+        k = self._resolve_key(key) or (key if key in self.g else None)
+        if not k or k not in self.g:
+            return []
+        out: List[dict] = []
+        seen: set[tuple] = set()
+
+        def _emit(other: str, rel: str, direction: str, evidence, doc_id) -> None:
+            if other == k or other not in self.g:
+                return
+            sig = (other, rel, direction)
+            if sig in seen:
+                return
+            seen.add(sig)
+            n = self.g.nodes[other]
+            out.append({
+                "relation": rel,
+                "direction": direction,
+                "other": other,
+                "label": n.get("label", other),
+                "type": n.get("type", "Unknown"),
+                "evidence": evidence or "",
+                "doc_id": doc_id,
+            })
+
+        for _, v, data in self.g.out_edges(k, data=True):
+            _emit(v, data.get("type", "RELATED"), "out",
+                  data.get("evidence"), data.get("doc_id"))
+        for u, _, data in self.g.in_edges(k, data=True):
+            _emit(u, data.get("type", "RELATED"), "in",
+                  data.get("evidence"), data.get("doc_id"))
+        return out
+
+    def equipment_tags(self) -> List[dict]:
+        """All Equipment/Location nodes with a plant-tag-shaped label — the
+        candidate clickable symbols on any P&ID."""
+        import re
+        tagish = re.compile(r"^[A-Za-z]{1,4}-?\d{1,4}[A-Za-z]?$")
+        out: List[dict] = []
+        for k, n in self.g.nodes(data=True):
+            label = n.get("label", k)
+            if n.get("type") == "Equipment" or tagish.match(label):
+                out.append({"key": k, "label": label, "type": n.get("type", "Equipment"),
+                            "docs": sorted(n.get("docs", set()))})
+        return out
+
+
     def paths_between(self, a: str, b: str, cutoff: int = 4) -> List[List[GraphPathHop]]:
         ka, kb = self._resolve_key(a), self._resolve_key(b)
         if not ka or not kb or ka not in self.g or kb not in self.g:

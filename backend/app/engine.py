@@ -34,6 +34,11 @@ class Engine:
         self._ingest_lock = threading.Lock()
         self._seed_fallback: Optional[SeedMock] = None
         self._trust_cache: Optional[TrustReport] = None
+        self._compliance_cache: Optional[ComplianceReport] = None
+        # Interactive P&ID: raw image bytes + detected symbol geometry, keyed by
+        # doc id, for uploaded drawings (the seed drawing is authored in pid.py).
+        self._pid_images: dict[str, tuple[bytes, str]] = {}
+        self._pid_geometry: dict[str, dict] = {}
 
     def _fallback_llm(self) -> SeedMock:
         """Offline provider used when a live API call fails mid-request."""
@@ -87,6 +92,13 @@ class Engine:
     def compliance(self, scope: str = "Unit CDU-1 charge pumps") -> ComplianceReport:
         return run_compliance(self.kg, self.index, scope)
 
+    def compliance_cached(self) -> ComplianceReport:
+        """Default-scope compliance report; cached until the corpus changes.
+        Used by the P&ID health colouring and entity dossiers."""
+        if self._compliance_cache is None:
+            self._compliance_cache = run_compliance(self.kg, self.index)
+        return self._compliance_cache
+
     def trust(self) -> TrustReport:
         """Corpus-wide trust report; cached until the corpus changes."""
         if self._trust_cache is None:
@@ -96,6 +108,32 @@ class Engine:
     def graph_view(self, focus: Optional[str] = None, radius: int = 2) -> dict:
         focus_list = [f.strip() for f in focus.split(",")] if focus else None
         return self.kg.to_viz(focus_list, radius)
+
+    # ------------------------------------------------------------------ #
+    # Interactive P&ID + entity dossiers
+    # ------------------------------------------------------------------ #
+    def has_pid_image(self, doc_id: str) -> bool:
+        return doc_id in self._pid_images
+
+    def pid_geometry(self, doc_id: str) -> Optional[dict]:
+        return self._pid_geometry.get(doc_id)
+
+    def pid_image(self, doc_id: str) -> Optional[tuple[bytes, str]]:
+        return self._pid_images.get(doc_id)
+
+    def pid_list(self) -> list[dict]:
+        from .pid import list_diagrams
+        return [s.model_dump() for s in list_diagrams(self)]
+
+    def pid_diagram(self, doc_id: str) -> Optional[dict]:
+        from .pid import build_diagram
+        d = build_diagram(self, doc_id)
+        return d.model_dump() if d else None
+
+    def entity_dossier(self, name: str) -> dict:
+        from .agents.dossier import build_dossier
+        return build_dossier(self.kg, name, self.compliance_cached(),
+                             self.trust()).model_dump()
 
     def documents(self) -> list[dict]:
         out = []
@@ -157,12 +195,29 @@ class Engine:
             else:
                 extraction = self._fallback_llm().extract(payload, doc_hint=doc.id)
 
+        # For P&ID images: keep the bytes (to display) and try to localize every
+        # symbol so the drawing becomes clickable. Failure is non-fatal — the
+        # drawing still works via the equipment-tag rail fallback.
+        pid_symbols: list = []
+        if kind == "image":
+            image_bytes, media_type = payload
+            self._pid_images[doc.id] = (image_bytes, media_type)
+            if self.llm.live:
+                try:
+                    pid_symbols = self.llm.locate_pid_symbols(image_bytes, media_type)
+                except Exception as exc:
+                    print(f"[engine] symbol localization failed ({exc})")
+            if pid_symbols:
+                self._pid_geometry[doc.id] = {"view": {"w": 1000, "h": 700},
+                                              "symbols": pid_symbols, "connections": []}
+
         with self._ingest_lock:
             before = self.kg.stats()
             self.kg.ingest_extraction(doc, extraction)
             self.index.build(self.kg.documents())
             after = self.kg.stats()
-            self._trust_cache = None  # corpus changed — recompute trust lazily
+            self._trust_cache = None       # corpus changed — recompute lazily
+            self._compliance_cache = None
 
         return {
             "document": {
@@ -173,6 +228,7 @@ class Engine:
             "extraction": extraction.model_dump(),
             "added_entities": after["entities"] - before["entities"],
             "added_relationships": after["relationships"] - before["relationships"],
+            "pid_symbols_located": len(pid_symbols),
             "provider": self.llm.name,
         }
 

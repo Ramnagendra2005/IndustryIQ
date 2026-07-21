@@ -17,24 +17,33 @@ const SUGGESTIONS = [
   { q: "What are the OEM vibration alarm and trip limits for P-101?", mode: "copilot" },
 ];
 
-export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field }) {
+export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) {
   const [mode, setMode] = useState("rca");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
   }, [messages, busy]);
 
+  // ask-bridge: a dossier (or any panel) can inject a question by bumping nonce.
+  useEffect(() => {
+    if (ask?.q && !busyRef.current) send(ask.q, ask.mode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask?.nonce]);
+
   async function send(q, m) {
     const question = (q ?? input).trim();
-    if (!question || busy) return;
+    if (!question || busyRef.current) return;
     const useMode = m ?? mode;
+    if (m) setMode(m);
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text: question }]);
     setBusy(true);
+    busyRef.current = true;
     const t0 = performance.now();
     try {
       const res = await api.query(question, useMode);
@@ -46,6 +55,7 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field }) {
       setMessages((prev) => [...prev, { role: "assistant", answer: "⚠️ " + e.message, confidence: 0, citations: [], graph_paths: [] }]);
     } finally {
       setBusy(false);
+      busyRef.current = false;
     }
   }
 

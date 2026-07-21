@@ -182,3 +182,93 @@ class TrustReport(BaseModel):
     stale_count: int = 0
     aging_count: int = 0
     elapsed_ms: int = 0
+
+
+# --------------------------------------------------------------------------- #
+# Interactive P&ID — "the drawing is the interface"
+# --------------------------------------------------------------------------- #
+class PidSymbol(BaseModel):
+    """One clickable symbol on a P&ID that maps to a knowledge-graph entity."""
+    tag: str                       # e.g. "P-101" (what's printed on the drawing)
+    entity: Optional[str] = None   # canonical graph name this symbol resolves to
+    label: str = ""
+    type: str = "Equipment"        # EntityType value
+    symbol: str = "generic"        # glyph kind: pump/valve/exchanger/column/tank/instrument/...
+    # Geometry. Vector diagrams carry cx/cy in `view` units; image overlays carry
+    # a normalized box [x, y, w, h] in 0..1 over the displayed image.
+    cx: Optional[float] = None
+    cy: Optional[float] = None
+    box: Optional[List[float]] = None
+    health: str = "ok"             # ok | watch | alert (from conflicts / compliance gaps)
+    doc_count: int = 0
+
+
+class PidConnection(BaseModel):
+    source: str                    # symbol tag
+    target: str                    # symbol tag
+    type: str = "CONNECTED_TO"     # CONNECTED_TO | SIBLING_OF | HAS_PART | ...
+    label: str = ""
+
+
+class PidDiagram(BaseModel):
+    doc_id: str
+    title: str
+    unit: Optional[str] = None
+    kind: str = "vector"           # "vector" (drawn from geometry) | "image" (overlay on photo)
+    image_url: Optional[str] = None
+    view: dict = Field(default_factory=lambda: {"w": 1000, "h": 600})
+    symbols: List[PidSymbol] = Field(default_factory=list)
+    connections: List[PidConnection] = Field(default_factory=list)
+    note: str = ""                 # e.g. offline-mode limitation on uploaded images
+
+
+class PidSummary(BaseModel):
+    doc_id: str
+    title: str
+    unit: Optional[str] = None
+    kind: str = "vector"
+    symbol_count: int = 0
+    alert_count: int = 0
+
+
+# --------------------------------------------------------------------------- #
+# Entity dossier — the full profile behind a clicked symbol
+# --------------------------------------------------------------------------- #
+class DossierLink(BaseModel):
+    name: str                      # canonical entity name
+    label: str
+    type: str
+    relation: str                  # relationship type connecting it to the subject
+    evidence: str = ""
+
+
+class DossierDoc(BaseModel):
+    doc_id: str
+    title: str
+    doc_type: str
+    date: Optional[str] = None
+    snippet: str = ""
+    freshness: float = 1.0
+    status: str = "fresh"          # fresh | aging | stale
+
+
+class EntityDossier(BaseModel):
+    name: str
+    label: str
+    type: str
+    description: str = ""
+    unit: Optional[str] = None
+    health: str = "ok"             # ok | watch | alert
+    connections_up: List[DossierLink] = Field(default_factory=list)
+    connections_down: List[DossierLink] = Field(default_factory=list)
+    siblings: List[DossierLink] = Field(default_factory=list)
+    failure_modes: List[DossierLink] = Field(default_factory=list)
+    parts: List[DossierLink] = Field(default_factory=list)
+    parameters: List[DossierLink] = Field(default_factory=list)
+    people: List[DossierLink] = Field(default_factory=list)
+    regulations: List[DossierLink] = Field(default_factory=list)
+    procedures: List[DossierLink] = Field(default_factory=list)
+    history: List[DossierDoc] = Field(default_factory=list)
+    compliance_gaps: List[ComplianceGap] = Field(default_factory=list)
+    conflicts: List[Conflict] = Field(default_factory=list)
+    found: bool = True

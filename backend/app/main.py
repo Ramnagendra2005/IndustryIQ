@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .engine import get_engine
@@ -49,6 +49,33 @@ def trust():
 @app.get("/api/graph")
 def graph(focus: str | None = None, radius: int = 2):
     return get_engine().graph_view(focus, radius)
+
+
+@app.get("/api/pids")
+def pids():
+    return get_engine().pid_list()
+
+
+@app.get("/api/pid/{doc_id}")
+def pid(doc_id: str):
+    d = get_engine().pid_diagram(doc_id)
+    if not d:
+        return JSONResponse({"error": "P&ID not found"}, status_code=404)
+    return d
+
+
+@app.get("/api/pid/{doc_id}/image")
+def pid_image(doc_id: str):
+    img = get_engine().pid_image(doc_id)
+    if not img:
+        return JSONResponse({"error": "image not found"}, status_code=404)
+    data, media_type = img
+    return Response(content=data, media_type=media_type)
+
+
+@app.get("/api/entity/{name}")
+def entity(name: str):
+    return get_engine().entity_dossier(name)
 
 
 @app.get("/api/documents")

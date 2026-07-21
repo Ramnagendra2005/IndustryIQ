@@ -38,10 +38,59 @@ class BaseLLM:
     def answer(self, system: str, question: str, context: str) -> str:
         raise NotImplementedError
 
+    def locate_pid_symbols(self, image_bytes: bytes, media_type: str) -> list[dict]:
+        """Detect clickable symbols on a P&ID image.
+
+        Returns a list of {tag, symbol, type, box:[x,y,w,h]} where the box is
+        normalized 0..1 over the image. Providers that cannot do vision return [].
+        """
+        return []
+
 
 # --------------------------------------------------------------------------- #
 # Prompts / JSON schema shared by both providers
 # --------------------------------------------------------------------------- #
+_LOCATE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "symbols": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "tag": {"type": "string"},
+                    "symbol": {
+                        "type": "string",
+                        "enum": ["pump", "valve", "exchanger", "column", "tank",
+                                 "vessel", "compressor", "instrument", "generic"],
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["Equipment", "ProcessParameter", "Location", "Part"],
+                    },
+                    "x": {"type": "number"},
+                    "y": {"type": "number"},
+                    "w": {"type": "number"},
+                    "h": {"type": "number"},
+                },
+                "required": ["tag", "symbol", "type", "x", "y", "w", "h"],
+            },
+        },
+    },
+    "required": ["symbols"],
+}
+
+_LOCATE_SYSTEM = (
+    "You are a P&ID digitizer. Find every equipment and instrument symbol that "
+    "carries a printed tag (pumps P-xxx, exchangers E-xxx, columns/vessels C-xxx/"
+    "D-xxx, tanks T-xxx, valves like MOV-xxx/XV-xxx, instrument bubbles like "
+    "VT/TT/PT/FT-xxx). For each, return its tag, an ISA symbol class, an entity "
+    "type, and a TIGHT bounding box around the symbol as x,y,w,h where every value "
+    "is a fraction of the image (0..1): x,y is the top-left corner, w,h the width "
+    "and height. Do not include piping, notes, title blocks or the border."
+)
 _EXTRACTION_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -133,12 +182,22 @@ class LiveGemini(BaseLLM):
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=_EXTRACTION_SYSTEM,
-                max_output_tokens=8000,
+                max_output_tokens=16000,
                 response_mime_type="application/json",
                 response_json_schema=_EXTRACTION_SCHEMA,
             ),
         )
-        return Extraction.model_validate_json(resp.text or "{}")
+        raw = resp.text or "{}"
+        try:
+            return Extraction.model_validate_json(raw)
+        except Exception:
+            # dense drawings can truncate the JSON — salvage the complete objects
+            # instead of dropping the whole extraction to the offline stub.
+            salvaged = _salvage_extraction(raw)
+            print(f"[llm] extraction JSON invalid for {doc_hint or 'doc'} "
+                  f"(raw {len(raw)} chars); salvaged {len(salvaged.entities)} entities / "
+                  f"{len(salvaged.relations)} relations")
+            return salvaged
 
     def extract(self, text: str, doc_hint: str = "") -> Extraction:
         contents = f"Document type hint: {doc_hint}\n\n---\n{text[:60000]}"
@@ -170,6 +229,34 @@ class LiveGemini(BaseLLM):
             ),
         )
         return resp.text or ""
+
+    def locate_pid_symbols(self, image_bytes: bytes, media_type: str) -> list[dict]:
+        from google.genai import types
+
+        # Vision JSON occasionally comes back truncated or fence-wrapped, which used
+        # to make this silently return [] (drawing falls back to the tag rail). We
+        # salvage partial output and retry once so localization is reliable.
+        for attempt in range(2):
+            resp = self._client.models.generate_content(
+                model=config.VISION_MODEL,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=media_type),
+                    "Digitize this P&ID: locate every tagged equipment and instrument symbol.",
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=_LOCATE_SYSTEM,
+                    max_output_tokens=16000,
+                    response_mime_type="application/json",
+                    response_json_schema=_LOCATE_SCHEMA,
+                ),
+            )
+            raw = resp.text or ""
+            out = _normalize_pid_symbols(_parse_symbol_objects(raw))
+            if out:
+                return out
+            print(f"[llm] locate_pid_symbols: no usable symbols on attempt {attempt + 1} "
+                  f"(raw {len(raw)} chars){' — retrying' if attempt == 0 else ''}")
+        return []
 
 
 # --------------------------------------------------------------------------- #
@@ -237,6 +324,130 @@ class SeedMock(BaseLLM):
 # --------------------------------------------------------------------------- #
 # Offline helpers
 # --------------------------------------------------------------------------- #
+def _strip_json_fence(raw: str) -> str:
+    text = (raw or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text[:4].lower() == "json":
+            text = text[4:]
+    return text.strip()
+
+
+def _all_json_objects(text: str) -> list[dict]:
+    """Every individually-complete ``{...}`` object anywhere in the string.
+
+    Balanced-brace scan that stays valid even when the enclosing array/object is
+    truncated mid-stream — the recovery path for cut-off vision/LLM JSON.
+    """
+    out: list[dict] = []
+    stack: list[int] = []
+    in_str = esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            frag = text[stack.pop():i + 1]
+            try:
+                o = json.loads(frag)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(o, dict):
+                out.append(o)
+    return out
+
+
+def _parse_symbol_objects(raw: str) -> list[dict]:
+    """Pull symbol dicts out of a vision JSON response, tolerating truncation.
+
+    The happy path is a clean ``{"symbols": [...]}`` blob. But vision models
+    sometimes wrap it in ```json fences or get cut off mid-array when the drawing
+    is dense — a plain ``json.loads`` then throws and we lose every symbol. So we
+    fall back to scanning for individually-complete ``{...}`` objects (which stay
+    valid even when the outer array never closes) and keep the located ones.
+    """
+    if not raw:
+        return []
+    text = _strip_json_fence(raw)
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and isinstance(data.get("symbols"), list):
+            return [s for s in data["symbols"] if isinstance(s, dict)]
+    except json.JSONDecodeError:
+        pass
+    return [o for o in _all_json_objects(text) if "tag" in o and "x" in o]
+
+
+def _salvage_extraction(raw: str) -> "Extraction":
+    """Recover a partial Extraction from truncated/invalid LLM JSON.
+
+    Entities and relations are distinguished by shape (name/type vs
+    source/target/type). Individual objects that don't validate are dropped
+    rather than sinking the whole extraction to the offline stub.
+    """
+    from .schemas import ExtractedEntity, ExtractedRelation
+
+    ents: list = []
+    rels: list = []
+    seen: set[str] = set()
+    for o in _all_json_objects(_strip_json_fence(raw)):
+        if "source" in o and "target" in o and "type" in o:
+            try:
+                rels.append(ExtractedRelation.model_validate(o))
+            except Exception:
+                continue
+        elif "name" in o and "type" in o:
+            name = str(o.get("name", "")).strip()
+            if not name or name in seen:
+                continue
+            try:
+                ent = ExtractedEntity.model_validate({
+                    "name": name, "type": o["type"],
+                    "aliases": o.get("aliases", []) or [],
+                    "description": o.get("description", "") or "",
+                })
+            except Exception:
+                continue
+            seen.add(name)
+            ents.append(ent)
+    return Extraction(entities=ents, relations=rels, summary="")
+
+
+def _normalize_pid_symbols(symbols: list[dict]) -> list[dict]:
+    """Clamp boxes to the image, drop degenerate/untagged ones, dedupe by tag."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for s in symbols:
+        try:
+            x, y, w, h = float(s["x"]), float(s["y"]), float(s["w"]), float(s["h"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        x, y = max(0.0, min(1.0, x)), max(0.0, min(1.0, y))
+        w, h = max(0.0, min(1.0, w)), max(0.0, min(1.0, h))
+        if w < 0.005 or h < 0.005:
+            continue
+        tag = str(s.get("tag", "")).strip()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        out.append({
+            "tag": tag,
+            "symbol": s.get("symbol", "generic"),
+            "type": s.get("type", "Equipment"),
+            "box": [round(x, 4), round(y, 4), round(w, 4), round(h, 4)],
+        })
+    return out
+
+
 def _tok(s: str) -> list[str]:
     return [w for w in "".join(c.lower() if c.isalnum() else " " for c in s).split() if len(w) > 2]
 
