@@ -1,0 +1,80 @@
+/* IndustryIQ · Premium SaaS design tokens
+ * Genre: bright flagship SaaS · Reference: Notion AI, Linear, Vercel, Stripe
+ * Palette: warm white canvas, violet-blue action accent, vivid teal for data
+ * Raw OKLCH channel values (no oklch() wrapper) for Tailwind /alpha modifiers.
+ */
+
+:root {
+  /* ── Surfaces — elevation goes LIGHTER on white canvas ── */
+  --iq-paper:    98% 0.004 240;    /* page canvas — pure warm white        */
+  --iq-paper-2:  96% 0.006 240;    /* card / panel                         */
+  --iq-paper-3:  92% 0.008 240;    /* raised card / hover surface          */
+  --iq-rule:     88% 0.010 240;    /* hairline border — soft, barely there */
+  --iq-rule-2:   80% 0.014 240;    /* strong border / hover edge           */
+
+  /* ── Text ── */
+  --iq-ink:      16% 0.016 255;    /* primary — near black                 */
+  --iq-neutral:  40% 0.018 255;    /* secondary body text                  */
+  --iq-muted:    60% 0.012 255;    /* tertiary / labels                    */
+
+  /* ── Brand signals ── */
+  --iq-accent:        56% 0.22  270;   /* violet-blue — primary action     */
+  --iq-accent-light:  95% 0.06  270;   /* accent tinted surface            */
+  --iq-accent-mid:    90% 0.10  270;   /* medium accent surface            */
+  --iq-accent-ink:    98% 0.004 240;   /* text on filled accent            */
+  --iq-accent2:       60% 0.20  340;   /* coral-rose — RCA / alert accent  */
+  --iq-data:          58% 0.18  195;   /* vivid cyan — telemetry & data    */
+  --iq-data-light:    94% 0.06  195;   /* tinted data surface              */
+  --iq-ok:            52% 0.17  155;   /* emerald — confirmed good         */
+  --iq-ok-light:      94% 0.06  155;   /* tinted ok surface                */
+  --iq-alarm:         52% 0.22   25;   /* red — danger, never decor        */
+  --iq-alarm-light:   96% 0.06   25;   /* tinted alarm surface             */
+  --iq-warn:          65% 0.18   75;   /* amber — warning / caution        */
+  --iq-warn-light:    96% 0.06   75;   /* tinted warn surface              */
+
+  /* ── Typography ── */
+  --font-display: "Space Grotesk", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ── Spacing — 4pt base ── */
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
+  --space-2xl: 3rem;
+
+  /* ── Motion — spring-forward, never mechanical ── */
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:      cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro:  100ms;
+  --dur-short:  200ms;
+  --dur-mid:    320ms;
+  --dur-long:   480ms;
+
+  /* ── Radius — generous and consistent ── */
+  --radius-sm:      6px;
+  --radius-md:      10px;
+  --radius-lg:      14px;
+  --radius-xl:      20px;
+  --radius-2xl:     28px;
+  --radius-panel:   12px;
+  --radius-control: 8px;
+  --radius-pill:    999px;
+
+  /* ── Shadows — soft, multi-layer ── */
+  --shadow-sm:   0 1px 2px oklch(0% 0 0 / 0.04), 0 1px 6px oklch(0% 0 0 / 0.03);
+  --shadow-md:   0 2px 8px oklch(0% 0 0 / 0.06), 0 4px 20px oklch(0% 0 0 / 0.05);
+  --shadow-lg:   0 4px 16px oklch(0% 0 0 / 0.08), 0 12px 40px oklch(0% 0 0 / 0.07);
+  --shadow-accent: 0 4px 20px oklch(var(--iq-accent) / 0.22);
+
+  /* ── Z scale ── */
+  --z-base:   1;
+  --z-raised: 10;
+  --z-sticky: 200;
+  --z-modal:  400;
+  --z-toast:  500;
+}

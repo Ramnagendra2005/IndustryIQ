@@ -23,6 +23,33 @@ _RCA_SYSTEM = ANSWER_SYSTEM + (
     "over 'bad bearing') when the evidence supports it."
 )
 
+# Field technicians often don't work in English. The corpus stays English, but
+# the ANSWER is delivered in the technician's language — with equipment tags,
+# [DOC:id] citations and numeric values kept verbatim so nothing safety-critical
+# is lost in translation.
+_LANG_NAMES = {
+    "hi": "Hindi (Devanagari script)",
+    "te": "Telugu",
+    "ta": "Tamil",
+    "kn": "Kannada",
+    "mr": "Marathi",
+    "bn": "Bengali",
+    "gu": "Gujarati",
+}
+
+
+def _lang_instruction(lang: str) -> str:
+    name = _LANG_NAMES.get(lang)
+    if not name:
+        return ""
+    return (
+        f"\n\nIMPORTANT: Write the entire answer in {name}, as spoken by plant "
+        "technicians (natural, spoken register — not literary). Keep equipment tags "
+        "(P-101), instrument tags (VT-101), document citations like [DOC:WO-2478], "
+        "numeric values and units (mm/s) EXACTLY as they are — never translate or "
+        "transliterate those."
+    )
+
 
 def _confidence(res: RetrievalResult, answer: str) -> float:
     """Heuristic 0..1 confidence from retrieval + corroboration + grounding."""
@@ -50,12 +77,15 @@ def _filter_citations(citations: List[Citation], answer: str) -> List[Citation]:
     return ranked + extra
 
 
-def run_copilot(kg, index, llm: BaseLLM, question: str, mode: str = "copilot") -> QueryResponse:
+def run_copilot(kg, index, llm: BaseLLM, question: str, mode: str = "copilot",
+                lang: str = "en") -> QueryResponse:
     t0 = time.perf_counter()
     graphrag = GraphRAG(kg, index)
     res = graphrag.retrieve(question, k=6, expand_radius=2)
 
     system = _RCA_SYSTEM if mode == "rca" else ANSWER_SYSTEM
+    if llm.live:  # seed answers are authored in English; only live mode translates
+        system += _lang_instruction(lang)
     if res.context.strip():
         answer = llm.answer(system, question, res.context)
     else:

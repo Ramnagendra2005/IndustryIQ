@@ -229,6 +229,35 @@ export const IconImage = (p) => (
   </I>
 );
 
+export const IconMic = (p) => (
+  <I {...p}>
+    <rect x="9.5" y="3" width="5" height="10" rx="2.5" />
+    <path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" />
+  </I>
+);
+
+export const IconSpeaker = (p) => (
+  <I {...p}>
+    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z" />
+    <path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" />
+  </I>
+);
+
+export const IconSpeakerOff = (p) => (
+  <I {...p}>
+    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z" />
+    <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" />
+  </I>
+);
+
+export const IconWifiOff = (p) => (
+  <I {...p}>
+    <path d="M12 18.5v.3" />
+    <path d="M8.5 15a5 5 0 0 1 4.5-1.4M5.5 11.5a9.5 9.5 0 0 1 3-1.9M18.5 11.5a9.4 9.4 0 0 0-2.6-1.7" />
+    <path d="M4 4l16 16" />
+  </I>
+);
+
 export const IconScale = (p) => (
   <I {...p}>
     <circle cx="12" cy="12" r="8.5" />

@@ -181,14 +181,27 @@ Goal: zero new features. Only verification and packaging.
         warnings when cited docs are conflicted/stale (Chat shows amber TRUST CHECK).
       * Verified: seed mode intact (0.98 conf RCA + trust), live mode works,
         off-topic refusal unaffected, `/api/trust` ~5 ms.
-- [ ] **2. Tacit Knowledge Capture ("Exit Interview AI")** — structured interview
+- [x] **2. Voice-first, multilingual field mode** (2026-07-20)
+      `src/voice.js` + `src/dossier.js` + Chat integration + backend `lang` param.
+      * Voice queries via Web Speech API (mic button, live transcript, pulsing
+        listening state); spoken answers via speechSynthesis; hands-free loop in
+        field mode (answer spoken → mic re-opens automatically).
+      * 7 languages (EN/HI/TE/TA/KN/MR/BN): live Gemini answers in the chosen
+        language with equipment tags, [DOC:] citations, values & units kept
+        verbatim (verified: Hindi answer preserved P-101 / 4.5 mm/s / [DOC:...]).
+        Seed mode stays English (authored answers).
+      * Offline dossier: every answer + full text of cited docs cached in
+        localStorage; when connectivity drops the copilot serves the best-matching
+        cached answer with an OFFLINE DOSSIER badge + banner (Chrome ASR needs
+        network, so offline input is typed — that's a browser limit).
+- [ ] **3. Tacit Knowledge Capture ("Exit Interview AI")** — structured interview
       agent for retiring experts → knowledge entries linked to equipment tags,
       contradiction check against SOPs via the Trust Layer.
-- [ ] **3. Interactive P&ID** — clickable schematic as the navigation layer;
+- [ ] **4. Interactive P&ID** — clickable schematic as the navigation layer;
       tap a pump → full dossier (history, failure modes, procedures, gaps).
-- [ ] **4. Proactive push on work-order ingest** — new WO for equipment X
+- [ ] **5. Proactive push on work-order ingest** — new WO for equipment X
       auto-attaches similar failures, lessons learned, permits, draft JSA.
-- [ ] **5. Live metrics dashboard** — in-app benchmark panel (accuracy,
+- [ ] **6. Live metrics dashboard** — in-app benchmark panel (accuracy,
       time-to-answer, abstention) instead of only `docs/BENCHMARK.md`.
 
 ---

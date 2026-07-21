@@ -76,14 +76,14 @@ class Engine:
                   "llm_provider": self.llm.name})
         return s
 
-    def answer(self, question: str, mode: str = "copilot") -> QueryResponse:
+    def answer(self, question: str, mode: str = "copilot", lang: str = "en") -> QueryResponse:
         try:
-            resp = run_copilot(self.kg, self.index, self.llm, question, mode)
+            resp = run_copilot(self.kg, self.index, self.llm, question, mode, lang)
         except Exception as exc:
             if not self.llm.live:
                 raise
             print(f"[engine] live answer failed ({exc}); retrying in offline seed mode")
-            resp = run_copilot(self.kg, self.index, self._fallback_llm(), question, mode)
+            resp = run_copilot(self.kg, self.index, self._fallback_llm(), question, mode, lang)
             resp.answer += "\n\n_(Live API unavailable — this answer was generated offline.)_"
         if resp.citations:
             resp.trust = annotate_answer(self.kg, resp.citations, self.trust())

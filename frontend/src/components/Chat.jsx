@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { api } from "../api";
 import { renderRich } from "../lib";
 import { CountUp, Reveal, StreamText, RadialGauge, ThinkingIndicator } from "../fx";
-import { IconChat, IconMicroscope, IconSend, IconBrain, IconConflict, DocTypeIcon, DOCTYPE_TINT } from "../icons";
+import { IconChat, IconMicroscope, IconSend, IconBrain, IconConflict, IconMic, IconSpeaker, IconSpeakerOff, IconWifiOff, DocTypeIcon, DOCTYPE_TINT } from "../icons";
+import { LANGS, makeRecognizer, speak, stopSpeaking, speechSupported } from "../voice";
+import { rememberAnswer, rememberDoc, offlineAnswer, dossierStats } from "../dossier";
 
 const MODES = [
   { id: "copilot", label: "Ask", hint: "General operational Q&A" },
@@ -25,6 +27,78 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) 
   const scrollRef = useRef(null);
   const busyRef = useRef(false);
 
+  // ---- voice-first field mode ------------------------------------------- //
+  const [lang, setLang] = useState(() => localStorage.getItem("iiq-lang") || "en");
+  const [voiceOut, setVoiceOut] = useState(() => {
+    const s = localStorage.getItem("iiq-voice");
+    return s ? s === "1" : !!field; // field technicians default to spoken answers
+  });
+  const [listening, setListening] = useState(false);
+  const [voiceNote, setVoiceNote] = useState("");
+  const [online, setOnline] = useState(navigator.onLine);
+  const [dossier, setDossier] = useState(dossierStats());
+  const L = LANGS.find((l) => l.code === lang) || LANGS[0];
+
+  const recRef = useRef(null);
+  const listeningRef = useRef(false);
+  const voiceOutRef = useRef(voiceOut); voiceOutRef.current = voiceOut;
+  const fieldRef = useRef(field); fieldRef.current = field;
+  const bcpRef = useRef(L.bcp); bcpRef.current = L.bcp;
+
+  useEffect(() => localStorage.setItem("iiq-lang", lang), [lang]);
+  useEffect(() => {
+    localStorage.setItem("iiq-voice", voiceOut ? "1" : "0");
+    if (!voiceOut) stopSpeaking();
+  }, [voiceOut]);
+  useEffect(() => {
+    const on = () => setOnline(true), off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+  useEffect(() => {
+    if (!voiceNote) return;
+    const id = setTimeout(() => setVoiceNote(""), 4000);
+    return () => clearTimeout(id);
+  }, [voiceNote]);
+  useEffect(() => () => { stopSpeaking(); try { recRef.current?.stop(); } catch { /* already stopped */ } }, []);
+
+  function stopListening() {
+    try { recRef.current?.stop(); } catch { /* already stopped */ }
+    recRef.current = null;
+    listeningRef.current = false;
+    setListening(false);
+  }
+
+  function startListening() {
+    if (!speechSupported || listeningRef.current) return;
+    stopSpeaking();
+    const rec = makeRecognizer(bcpRef.current, {
+      onInterim: (t) => setInput(t),
+      onFinal: (t) => { setInput(""); stopListening(); if (t) send(t); },
+      onEnd: () => { listeningRef.current = false; setListening(false); recRef.current = null; },
+      onError: (err) => {
+        setVoiceNote(err === "network" ? "voice recognition needs connectivity — type instead"
+          : err === "not-allowed" ? "microphone permission denied"
+          : err === "no-speech" ? "didn't catch that — tap the mic and try again"
+          : `voice error: ${err}`);
+      },
+    });
+    if (!rec) return;
+    recRef.current = rec;
+    listeningRef.current = true;
+    setListening(true);
+    try { rec.start(); } catch { stopListening(); }
+  }
+
+  // hands-free loop: in field mode, once the answer is spoken, listen again
+  function maybeRelisten() {
+    if (fieldRef.current && voiceOutRef.current && speechSupported && navigator.onLine) {
+      setTimeout(() => startListening(), 400);
+    }
+  }
+  // ------------------------------------------------------------------------ //
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
   }, [messages, busy]);
@@ -41,16 +115,41 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) 
     const useMode = m ?? mode;
     if (m) setMode(m);
     setInput("");
+    stopSpeaking();
     setMessages((prev) => [...prev, { role: "user", text: question }]);
     setBusy(true);
     busyRef.current = true;
     const t0 = performance.now();
+
+    // poor-connectivity plant area: answer from the locally cached dossier
+    if (!navigator.onLine) {
+      const hit = offlineAnswer(question);
+      if (hit) {
+        const msg = { role: "assistant", ...hit, graph_paths: [], elapsed_ms: 0, _offline: true, _wall: Math.round(performance.now() - t0) };
+        setMessages((prev) => [...prev, msg]);
+        if (voiceOutRef.current) speak(hit.answer, bcpRef.current, maybeRelisten);
+      } else {
+        setMessages((prev) => [...prev, {
+          role: "assistant", confidence: 0, citations: [], graph_paths: [],
+          answer: "You're offline and this question isn't in the cached dossier yet. Ask about equipment you've queried before, or reconnect to reach the full plant corpus.",
+        }]);
+      }
+      setBusy(false);
+      return;
+    }
+
     try {
-      const res = await api.query(question, useMode);
+      const res = await api.query(question, useMode, lang);
       res._wall = Math.round(performance.now() - t0);
       setMessages((prev) => [...prev, { role: "assistant", ...res }]);
       onTrail?.(res.graph_paths || []);
       if (res.focus_entities?.length) onFocusEntity?.(res.focus_entities.join(","));
+      // grow the offline dossier: the answer + full text of its cited sources
+      rememberAnswer(question, res);
+      (res.citations || []).slice(0, 4).forEach((c) =>
+        api.document(c.doc_id).then(rememberDoc).catch(() => {}));
+      setDossier(dossierStats());
+      if (voiceOutRef.current) speak(res.answer, bcpRef.current, maybeRelisten);
     } catch (e) {
       setMessages((prev) => [...prev, { role: "assistant", answer: "⚠️ " + e.message, confidence: 0, citations: [], graph_paths: [] }]);
     } finally {
@@ -82,10 +181,49 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) 
             <span className="relative z-10">{mm.label}</span>
           </button>
         ))}
-        <span className="text-xs text-slate-500 ml-1 hidden sm:inline">
+        <span className="text-xs text-slate-500 ml-1 hidden lg:inline truncate">
           {MODES.find((x) => x.id === mode)?.hint}
         </span>
+
+        {/* voice-first field controls: language · spoken answers · connectivity */}
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {!online && (
+            <span className="flex items-center gap-1 text-[10px] font-mono text-amber bg-amber/10 border border-amber/40 rounded-full px-2 py-0.5 tracking-wide">
+              <IconWifiOff className="w-3 h-3" /> OFFLINE
+            </span>
+          )}
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value)}
+            title="Answer & voice language (live mode answers in this language)"
+            className="glass rounded-lg px-1.5 py-1 text-xs bg-transparent text-slate-200 outline-none border border-edge cursor-pointer"
+          >
+            {LANGS.map((l) => (
+              <option key={l.code} value={l.code} className="bg-panel text-slate-200">
+                {l.label} · {l.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setVoiceOut((v) => !v)}
+            title={voiceOut ? "Spoken answers: ON" : "Spoken answers: OFF"}
+            className={`w-7 h-7 rounded-lg grid place-items-center border transition-colors ${
+              voiceOut ? "text-teal border-teal/40 bg-teal/10" : "text-slate-500 border-edge glass hover:text-white"
+            }`}
+          >
+            {voiceOut ? <IconSpeaker className="w-4 h-4" /> : <IconSpeakerOff className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
+
+      {/* offline: the copilot runs on the cached equipment dossier */}
+      {!online && (
+        <div className="shrink-0 px-3 py-1.5 bg-amber/10 border-b border-amber/30 text-[11px] text-amber font-mono flex items-center gap-2 tracking-wide">
+          <IconWifiOff className="w-3.5 h-3.5 shrink-0" />
+          OFFLINE — SERVING FROM CACHED DOSSIER · {dossier.answers} ANSWERS / {dossier.docs} DOCS
+          {dossier.topEntity ? ` · ${dossier.topEntity}` : ""}
+        </div>
+      )}
 
       {/* messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
@@ -162,15 +300,52 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) 
       </div>
 
       {/* input */}
-      <div className="p-3 border-t border-edge shrink-0">
+      <div className="p-3 pt-2 border-t border-edge shrink-0">
+        {online && dossier.answers > 0 && (
+          <div className="pb-1.5 text-[10px] font-mono text-slate-500 flex items-center gap-1.5 tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal live-dot" />
+            OFFLINE DOSSIER READY — {dossier.answers} answers · {dossier.docs} docs cached
+            {dossier.topEntity ? ` · ${dossier.topEntity}` : ""}
+          </div>
+        )}
+        {voiceNote && (
+          <div className="pb-1.5 text-[11px] font-mono text-amber flex items-center gap-1.5">
+            <IconMic className="w-3.5 h-3.5" /> {voiceNote}
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder={field ? "Ask from the field…" : "Ask about any asset, failure, or regulation…"}
-            className="flex-1 glass rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-accent focus:shadow-glow-accent transition-shadow bg-transparent"
+            placeholder={listening ? `listening (${L.name})… speak now` : field ? "Ask from the field — tap the mic and speak…" : "Ask about any asset, failure, or regulation…"}
+            className={`flex-1 glass rounded-xl px-3.5 py-2.5 text-sm outline-none transition-shadow bg-transparent ${
+              listening ? "border-red-400/60 shadow-glow-danger" : "focus:border-accent focus:shadow-glow-accent"
+            }`}
           />
+          {speechSupported && (
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              onClick={() => (listening ? stopListening() : startListening())}
+              title={listening ? "Stop listening" : `Speak your question (${L.name})`}
+              className={`w-11 h-11 rounded-xl grid place-items-center border transition-all ${
+                listening
+                  ? "bg-red-500/15 border-red-400/70 text-red-300 shadow-glow-danger"
+                  : "glass border-edge text-slate-300 hover:text-white hover:border-teal"
+              }`}
+            >
+              <span className="relative grid place-items-center">
+                {listening && (
+                  <motion.span
+                    className="absolute w-9 h-9 rounded-full border border-red-400/60"
+                    animate={{ scale: [1, 1.45], opacity: [0.8, 0] }}
+                    transition={{ duration: 1.1, repeat: Infinity, ease: "easeOut" }}
+                  />
+                )}
+                <IconMic className="w-5 h-5" />
+              </span>
+            </motion.button>
+          )}
           <motion.button
             whileTap={{ scale: 0.88 }}
             onClick={() => send()}
@@ -236,6 +411,13 @@ function VibrationMeter({ value, alarm, trip }) {
   );
 }
 
+function timeAgo(ts) {
+  const mins = Math.max(1, Math.round((Date.now() - ts) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  return hrs < 24 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`;
+}
+
 function Answer({ m, onFocusEntity, onOpenDoc, stream }) {
   const baselineMin = 20; // McKinsey: ~35% of day searching; a manual cross-doc dig ≈ 20 min
   const [streamed, setStreamed] = useState(!stream);
@@ -271,6 +453,11 @@ function Answer({ m, onFocusEntity, onOpenDoc, stream }) {
             {m.mode === "rca" && (
               <div className="bg-accent/10 text-accent border border-accent/30 rounded-full px-2.5 py-1 flex items-center gap-1.5">
                 <IconMicroscope className="w-3.5 h-3.5" /> Root-Cause Analysis
+              </div>
+            )}
+            {m._offline && (
+              <div className="bg-amber/10 text-amber border border-amber/40 rounded-full px-2.5 py-1 font-mono flex items-center gap-1.5" title="Answered without connectivity, from the locally cached equipment dossier">
+                <IconWifiOff className="w-3.5 h-3.5" /> OFFLINE DOSSIER{m.at ? ` · cached ${timeAgo(m.at)}` : ""}
               </div>
             )}
             {m.trust && (
