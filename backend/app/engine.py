@@ -18,6 +18,7 @@ from .agents.trust import annotate_answer, run_trust
 from .graph.store import KnowledgeGraph
 from .ingestion.parsers import parse_upload
 from .llm import SeedMock, get_llm
+from .persistence import get_store
 from .retrieval.index import HybridIndex
 from .schemas import ComplianceReport, Document, Extraction, QueryResponse, TrustReport
 
@@ -26,10 +27,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 
 class Engine:
-    def __init__(self) -> None:
+    """One engine per industry (tenant): its own graph, index and documents.
+
+    The 'demo' industry boots with the authored seed corpus; every other
+    industry starts empty and is built purely from its own uploads."""
+
+    def __init__(self, industry_id: str = "demo") -> None:
+        self.industry_id = industry_id
         self.kg = KnowledgeGraph()
         self.index = HybridIndex()
         self.llm = get_llm()
+        self.store = get_store()
         self._ready = False
         self._ingest_lock = threading.Lock()
         self._seed_fallback: Optional[SeedMock] = None
@@ -55,25 +63,54 @@ class Engine:
         history. NEW documents uploaded at runtime go through the live LLM
         extractor via `ingest_upload`.
         """
-        import corpus_data  # authored single-source-of-truth
+        if self.industry_id == "demo":
+            import corpus_data  # authored single-source-of-truth
 
-        for d in corpus_data.DOCS:
-            doc = Document(
-                id=d["id"], title=d["title"], doc_type=d["doc_type"],
-                date=d.get("date"), unit=d.get("unit"), text=d["text"],
-                is_image=d.get("is_image", False),
-            )
-            extraction = Extraction.model_validate(d["extraction"])
-            self.kg.ingest_extraction(doc, extraction)
+            for d in corpus_data.DOCS:
+                doc = Document(
+                    id=d["id"], title=d["title"], doc_type=d["doc_type"],
+                    date=d.get("date"), unit=d.get("unit"), text=d["text"],
+                    is_image=d.get("is_image", False),
+                )
+                extraction = Extraction.model_validate(d["extraction"])
+                self.kg.ingest_extraction(doc, extraction)
 
+        self._restore_persisted()
         self.index.build(self.kg.documents())
         self._ready = True
+
+    def _restore_persisted(self) -> None:
+        """Fold previously-uploaded documents back in from the persistence store.
+
+        Purely additive on top of the seed corpus: if the store is offline,
+        empty, or half-broken, the app still boots with seed data alone.
+        """
+        try:
+            rows = self.store.restore_documents(self.industry_id)
+        except Exception as exc:  # store swallows its own errors; belt-and-braces
+            print(f"[engine] persisted restore failed ({exc}); continuing with seed corpus")
+            return
+        restored = 0
+        for row in rows:
+            doc, extraction = row["document"], row["extraction"]
+            if self.kg.get_document(doc.id):
+                continue  # already in the seed corpus / duplicate row
+            self.kg.ingest_extraction(doc, extraction)
+            if row.get("image"):
+                self._pid_images[doc.id] = row["image"]
+            if row.get("pid_geometry"):
+                self._pid_geometry[doc.id] = row["pid_geometry"]
+            restored += 1
+        if restored:
+            print(f"[engine] restored {restored} persisted document(s) from {self.store.name}")
 
     # ------------------------------------------------------------------ #
     def status(self) -> dict:
         s = config.status()
         s.update({"ready": self._ready, "graph": self.kg.stats(),
-                  "llm_provider": self.llm.name})
+                  "llm_provider": self.llm.name,
+                  "industry_id": self.industry_id,
+                  "persistence": self.store.status()})
         return s
 
     def answer(self, question: str, mode: str = "copilot", lang: str = "en") -> QueryResponse:
@@ -87,6 +124,13 @@ class Engine:
             resp.answer += "\n\n_(Live API unavailable — this answer was generated offline.)_"
         if resp.citations:
             resp.trust = annotate_answer(self.kg, resp.citations, self.trust())
+        # store the conversation context (fire-and-forget; never blocks the answer)
+        try:
+            self.store.log_query(question, mode, lang, resp.answer,
+                                 resp.confidence, self.llm.name,
+                                 industry_id=self.industry_id)
+        except Exception as exc:
+            print(f"[engine] query log failed ({exc}) — answer unaffected")
         return resp
 
     def compliance(self, scope: str = "Unit CDU-1 charge pumps") -> ComplianceReport:
@@ -219,6 +263,15 @@ class Engine:
             self._trust_cache = None       # corpus changed — recompute lazily
             self._compliance_cache = None
 
+        # persist the upload so it survives restarts (non-fatal if the store is down)
+        try:
+            self.store.save_document(doc, extraction,
+                                     pid_geometry=self._pid_geometry.get(doc.id),
+                                     image=self._pid_images.get(doc.id),
+                                     industry_id=self.industry_id)
+        except Exception as exc:
+            print(f"[engine] persist failed ({exc}) — document remains in memory")
+
         return {
             "document": {
                 "id": doc.id, "title": doc.title,
@@ -233,12 +286,21 @@ class Engine:
         }
 
 
-_ENGINE: Optional[Engine] = None
+_ENGINES: dict[str, Engine] = {}
+_ENGINE_LOCK = threading.Lock()
 
 
-def get_engine() -> Engine:
-    global _ENGINE
-    if _ENGINE is None:
-        _ENGINE = Engine()
-        _ENGINE.bootstrap()
-    return _ENGINE
+def get_engine(industry_id: str = "demo") -> Engine:
+    """Return the engine for an industry, building + bootstrapping it on first
+    use. One tenant's graph is never visible to another. The heavy embedding
+    model is shared across engines (see HybridIndex._MODEL_CACHE)."""
+    industry_id = industry_id or "demo"
+    eng = _ENGINES.get(industry_id)
+    if eng is None:
+        with _ENGINE_LOCK:
+            eng = _ENGINES.get(industry_id)
+            if eng is None:
+                eng = Engine(industry_id)
+                eng.bootstrap()
+                _ENGINES[industry_id] = eng
+    return eng

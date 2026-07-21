@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "./api";
+import { api, auth } from "./api";
+import Auth from "./components/Auth";
 import Chat from "./components/Chat";
 import GraphView from "./components/GraphView";
 import Documents from "./components/Documents";
@@ -32,8 +33,28 @@ export default function App() {
   const [ask, setAsk] = useState(null); // {q, mode, nonce} bridge: dossier → chat
   const [mobilePanel, setMobilePanel] = useState(params.has("tab")); // mobile: show panels vs chat
   const [booted, setBooted] = useState(() => sessionStorage.getItem("iq-booted") === "1");
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
-  useEffect(() => { api.status().then(setStatus).catch(() => {}); }, [reloadKey]);
+  // Restore an existing session on load; a stale token clears itself (api.js 401 handler).
+  useEffect(() => {
+    if (!auth.token) { setAuthReady(true); return; }
+    api.me().then(setUser).catch(() => auth.clear()).finally(() => setAuthReady(true));
+    return auth.onChange((t) => { if (!t) setUser(null); });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    api.status().then(setStatus).catch(() => {});
+  }, [reloadKey, user]);
+
+  function signOut() {
+    api.logout();
+    setUser(null);
+    setStatus(null);
+    sessionStorage.removeItem("iq-booted");
+    setBooted(false);
+  }
 
   function openDocument(id) {
     setOpenDoc(id);
@@ -53,8 +74,17 @@ export default function App() {
     setBooted(true);
   }
 
+  // Fresh industry with an empty graph → start on Ingest so they upload first.
+  useEffect(() => {
+    if (booted && status?.graph && status.graph.documents === 0 && !params.has("tab")) {
+      setTab("ingest");
+    }
+  }, [booted, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const graph = status?.graph;
 
+  if (!authReady) return <div className="h-full grid place-items-center text-slate-500 text-sm">Loading…</div>;
+  if (!user) return <Auth onAuthed={(u) => { setUser(u); sessionStorage.removeItem("iq-booted"); setBooted(false); }} />;
   if (!booted) return <BootSplash status={status} onDone={finishBoot} />;
 
   return (
@@ -113,6 +143,25 @@ export default function App() {
               </button>
             ))}
           </div>
+
+          {user && (
+            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-edge">
+              <div className="hidden sm:block leading-tight text-right">
+                <div className="text-xs text-white font-medium">{user.industry}</div>
+                <div className="text-[10px] text-slate-400 -mt-0.5">{user.name}</div>
+              </div>
+              <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 grid place-items-center text-[11px] font-semibold text-accent">
+                {(user.name || "?").slice(0, 1).toUpperCase()}
+              </div>
+              <button
+                onClick={signOut}
+                title="Sign out"
+                className="text-[11px] text-slate-400 hover:text-white glass rounded-lg px-2 py-1 transition"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </motion.header>
 

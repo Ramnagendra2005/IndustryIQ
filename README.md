@@ -98,6 +98,40 @@ cp .env.example .env
 > seed mode, the demo is bulletproof on stage — and it doubles as the "works air-gapped
 > for secure industrial sites" pitch. Live mode is a drop-in upgrade, not a rewrite.
 
+### 4. (Optional) Supabase persistence
+By default all state is in-memory (uploads vanish on restart). To persist uploaded
+documents, extractions, P&ID geometry and query history across restarts:
+
+1. Create a free project at https://supabase.com and run
+   [`backend/supabase_schema.sql`](backend/supabase_schema.sql) once in its SQL editor.
+2. In `.env`, set `SUPABASE_URL=https://<ref>.supabase.co` and `SUPABASE_KEY=<anon key>`
+   (`PERSIST_MODE=auto` flips to supabase automatically).
+
+Same fallback contract as the LLM layer: if the env vars are missing or Supabase is
+unreachable — even mid-session — the app keeps running on the in-memory seed corpus.
+Persistence is an enhancement layer, not a new point of failure.
+
+### 5. Accounts & industries (multi-tenant)
+Every user belongs to an **industry** (their company), and each industry has its own
+private knowledge graph, documents and query history — one tenant can never see
+another's data. The backend scopes every request to the caller's industry via a
+signed Bearer token.
+
+- **Just exploring?** The login page shows demo credentials — `demo@industryiq.app` /
+  `demo123` — which open the pre-seeded **Demo Refinery** with its full 11-doc corpus.
+  This account always works, even fully offline.
+- **New company:** *Create account → New industry*. You get a fresh, empty graph and an
+  **invite code**; the app lands you on the Ingest tab to upload your first document.
+- **Joining a company:** *Create account → Join with code* and enter the invite code
+  from your industry's admin.
+
+Accounts follow the same fallback contract: they live in memory (so signup and the demo
+account work with no database) and are mirrored to Supabase when it's reachable, so they
+survive restarts. Passwords are PBKDF2-hashed; tokens are HMAC-signed (no new deps).
+Set `IIQ_SECRET` in `.env` for a stable token-signing key across restarts (otherwise one
+is generated once and cached to the data dir as `.auth_secret`). Token lifetime defaults
+to 7 days — override with `IIQ_TOKEN_TTL` (seconds).
+
 ---
 
 ## 🧭 Try these

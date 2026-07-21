@@ -44,6 +44,11 @@ class Passage:
     text: str
 
 
+# One StaticModel per model name, shared by every index instance — with one
+# engine per industry, per-instance loading would duplicate the model N times.
+_MODEL_CACHE: dict = {}
+
+
 class HybridIndex:
     def __init__(self, embed_model: Optional[str] = None) -> None:
         self.passages: List[Passage] = []
@@ -58,9 +63,10 @@ class HybridIndex:
             from model2vec import StaticModel
 
             from .. import config
-            self._model = StaticModel.from_pretrained(
-                self._embed_model_name or config.EMBED_MODEL
-            )
+            name = self._embed_model_name or config.EMBED_MODEL
+            if name not in _MODEL_CACHE:
+                _MODEL_CACHE[name] = StaticModel.from_pretrained(name)
+            self._model = _MODEL_CACHE[name]
         return self._model
 
     def build(self, documents: List[Document]) -> None:
