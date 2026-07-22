@@ -64,6 +64,12 @@ export default function App() {
   function focusEntity(e) {
     setFocus(e);
     setTab("graph");
+    setMobilePanel(true); // mobile/field: tapping an entity reveals the graph
+  }
+  // passive variant: answers re-aim the graph without stealing the screen
+  function aimGraph(e) {
+    setFocus(e);
+    if (tab !== "docs") setTab("graph");
   }
   function askCopilot(q, mode = "copilot") {
     setAsk({ q, mode, nonce: Date.now() });
@@ -174,10 +180,33 @@ export default function App() {
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-            className={`md:w-[46%] md:max-w-[560px] border-r border-edge min-h-0 flex-1 md:flex-none ${mobilePanel ? "hidden md:flex md:flex-col" : "flex flex-col"}`}
+            className={field
+              ? `min-h-0 flex-1 ${mobilePanel ? "hidden" : "flex flex-col"}`
+              : `md:w-[46%] md:max-w-[560px] border-r border-edge min-h-0 flex-1 md:flex-none ${mobilePanel ? "hidden md:flex md:flex-col" : "flex flex-col"}`}
           >
-            <Chat onFocusEntity={focusEntity} onOpenDoc={openDocument} onTrail={setTrail} field={field} ask={ask} />
+            <Chat onFocusEntity={focusEntity} onAimGraph={aimGraph} onOpenDoc={openDocument} onTrail={setTrail} field={field} ask={ask} />
           </motion.section>
+
+          {/* field mode: single-column graph/docs view, toggled by the bottom nav */}
+          {field && (
+            <section className={`flex-1 min-h-0 flex-col ${mobilePanel ? "flex" : "hidden"}`}>
+              <div className="shrink-0 flex items-center gap-2 px-2 py-1.5 border-b border-edge">
+                <button className="text-slate-400 hover:text-white px-2 text-sm" onClick={() => setMobilePanel(false)}>
+                  ← copilot
+                </button>
+                <span className="text-sm text-white font-medium flex items-center gap-1.5">
+                  {tab === "docs"
+                    ? <><IconDocs className="w-4 h-4 text-accent" /> Documents</>
+                    : <><IconGraph className="w-4 h-4 text-accent" /> Knowledge Graph</>}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0">
+                {tab === "docs"
+                  ? <Documents openId={openDoc} onClose={() => setOpenDoc(null)} key={"fd" + reloadKey} />
+                  : <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} version={reloadKey} key={"fg" + reloadKey} />}
+              </div>
+            </section>
+          )}
 
           {/* panels */}
           {!field && (
@@ -231,8 +260,26 @@ export default function App() {
         </div>
       </div>
 
-      {/* mobile bottom nav */}
-      {!field && (
+      {/* bottom nav — engineer: mobile only; field: always (single-column UI) */}
+      {field ? (
+        <nav className="shrink-0 border-t border-edge glass-strong relative z-10">
+          <div className="max-w-md mx-auto w-full flex">
+            <button onClick={() => setMobilePanel(false)} className={`flex-1 py-2.5 text-xs flex items-center justify-center gap-1.5 ${!mobilePanel ? "text-accent" : "text-slate-400"}`}>
+              <IconChat className="w-4 h-4" /> Copilot
+            </button>
+            <button onClick={() => { setMobilePanel(true); setTab("graph"); }} className={`flex-1 py-2.5 text-xs flex items-center justify-center gap-1.5 ${mobilePanel && tab !== "docs" ? "text-accent" : "text-slate-400"}`}>
+              <span className="relative">
+                <IconGraph className="w-4 h-4" />
+                {trail.length > 0 && <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-amber live-dot" />}
+              </span>
+              Graph
+            </button>
+            <button onClick={() => { setMobilePanel(true); setTab("docs"); }} className={`flex-1 py-2.5 text-xs flex items-center justify-center gap-1.5 ${mobilePanel && tab === "docs" ? "text-accent" : "text-slate-400"}`}>
+              <IconDocs className="w-4 h-4" /> Docs
+            </button>
+          </div>
+        </nav>
+      ) : (
         <nav className="md:hidden shrink-0 border-t border-edge glass-strong flex relative z-10">
           <button onClick={() => setMobilePanel(false)} className={`flex-1 py-2 text-xs flex items-center justify-center gap-1.5 ${!mobilePanel ? "text-accent" : "text-slate-400"}`}>
             <IconChat className="w-4 h-4" /> Copilot

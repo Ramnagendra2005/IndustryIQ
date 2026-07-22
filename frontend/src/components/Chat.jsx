@@ -19,7 +19,7 @@ const SUGGESTIONS = [
   { q: "What are the OEM vibration alarm and trip limits for P-101?", mode: "copilot" },
 ];
 
-export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) {
+export default function Chat({ onFocusEntity, onAimGraph, onOpenDoc, onTrail, field, ask }) {
   const [mode, setMode] = useState("rca");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -143,7 +143,7 @@ export default function Chat({ onFocusEntity, onOpenDoc, onTrail, field, ask }) 
       res._wall = Math.round(performance.now() - t0);
       setMessages((prev) => [...prev, { role: "assistant", ...res }]);
       onTrail?.(res.graph_paths || []);
-      if (res.focus_entities?.length) onFocusEntity?.(res.focus_entities.join(","));
+      if (res.focus_entities?.length) (onAimGraph || onFocusEntity)?.(res.focus_entities.join(","));
       // grow the offline dossier: the answer + full text of its cited sources
       rememberAnswer(question, res);
       (res.citations || []).slice(0, 4).forEach((c) =>

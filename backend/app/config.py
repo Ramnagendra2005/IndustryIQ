@@ -44,7 +44,23 @@ HOST = os.getenv("IIQ_HOST", "0.0.0.0")
 PORT = int(os.getenv("IIQ_PORT", "8000"))
 
 # Embedding model (torch-free static embeddings, downloaded once from HF).
+# Used offline and as the live-failure fallback matrix.
 EMBED_MODEL = os.getenv("IIQ_EMBED_MODEL", "minishlab/potion-base-8M")
+
+# Semantic search provider. "auto" => Gemini embeddings when a key is present
+# (real transformer semantics: synonyms/paraphrases match), else static.
+_EMBED = os.getenv("IIQ_EMBED_PROVIDER", "auto").strip().lower()
+if _EMBED == "auto":
+    EMBED_PROVIDER = "live" if GEMINI_API_KEY else "static"
+else:
+    EMBED_PROVIDER = "live" if _EMBED in ("live", "gemini") else "static"
+
+GEMINI_EMBED_MODEL = os.getenv("IIQ_GEMINI_EMBED_MODEL", "gemini-embedding-001")
+EMBED_DIM = int(os.getenv("IIQ_EMBED_DIM", "768"))
+# Out-of-corpus gate threshold for the live provider. Calibrated with
+# scripts/calibrate_embeddings.py: on-topic paraphrase queries score >= 0.668
+# max cosine against the corpus, off-topic <= 0.538 — 0.60 splits them.
+EMBED_RELEVANCE_MIN = float(os.getenv("IIQ_EMBED_RELEVANCE_MIN", "0.60"))
 
 
 def _auth_secret() -> str:
@@ -79,4 +95,6 @@ def status() -> dict:
         "answer_model": ANSWER_MODEL,
         "extract_model": EXTRACT_MODEL,
         "vision_model": VISION_MODEL,
+        "embed_provider": EMBED_PROVIDER,
+        "embed_model": GEMINI_EMBED_MODEL if EMBED_PROVIDER == "live" else EMBED_MODEL,
     }

@@ -55,18 +55,17 @@ class GraphRAG:
                 found.append(key)
         return found
 
-    # Measured over the benchmark questions vs 10 off-topic ones: on-topic
-    # queries score >= 0.386 max cosine against this corpus, off-topic <= 0.283.
-    RELEVANCE_MIN_COSINE = 0.33
-
     def retrieve(self, query: str, k: int = 6, expand_radius: int = 2) -> RetrievalResult:
         # 0. out-of-corpus gate: unless the query names a known entity, require
         # a minimum absolute semantic match so off-topic questions come back
-        # empty instead of dragging in the top-k-by-rank passages.
-        if (not self._focus_from_query(query)
-                and self.index.max_cosine(query) < self.RELEVANCE_MIN_COSINE):
-            return RetrievalResult(context="", citations=[],
-                                   focus_entities=[], graph_paths=[])
+        # empty instead of dragging in the top-k-by-rank passages. The threshold
+        # is provider-calibrated and returned alongside the cosine (the embedder
+        # can differ per query when a live call falls back to static).
+        if not self._focus_from_query(query):
+            cosine, threshold = self.index.max_cosine(query)
+            if cosine < threshold:
+                return RetrievalResult(context="", citations=[],
+                                       focus_entities=[], graph_paths=[])
 
         # 1. vector/lexical seeds
         hits = self.index.search(query, k=k)

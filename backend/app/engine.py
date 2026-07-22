@@ -292,8 +292,8 @@ _ENGINE_LOCK = threading.Lock()
 
 def get_engine(industry_id: str = "demo") -> Engine:
     """Return the engine for an industry, building + bootstrapping it on first
-    use. One tenant's graph is never visible to another. The heavy embedding
-    model is shared across engines (see HybridIndex._MODEL_CACHE)."""
+    use. One tenant's graph is never visible to another. The embedding
+    providers are shared across engines (see retrieval/embeddings.py)."""
     industry_id = industry_id or "demo"
     eng = _ENGINES.get(industry_id)
     if eng is None:
