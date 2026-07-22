@@ -225,4 +225,4 @@ Goal: zero new features. Only verification and packaging.
    or retrieval must preserve that cross-document link working end-to-end.
 3. Commit small and often to `main` (we're a hackathon team, not a PR bureaucracy),
    but pull before push and never force-push.
-4. When in doubt about scope: **polish beats features** from Day 3 onward.
+4. When in doubt about scope: **polishbeats features** from Day 3 onward.
