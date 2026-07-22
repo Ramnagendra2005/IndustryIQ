@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import config as _cfg
 from .auth import AuthError, get_auth, make_token, verify_token
 from .engine import get_engine
 from .schemas import QueryRequest
@@ -17,7 +18,7 @@ app = FastAPI(title="IndustryIQ — Unified Asset & Operations Brain", version="
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cfg.ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

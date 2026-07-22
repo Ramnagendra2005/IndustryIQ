@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
+import { forceCollide } from "d3-force-3d";
 import { api } from "../api";
 import { TYPE_COLORS } from "../lib";
 import { CountUp } from "../fx";
+import Dossier from "./Dossier";
 
 const LINK_TINT = {
   SIBLING_OF: "rgba(251, 191, 36, 0.45)",
@@ -12,6 +14,13 @@ const LINK_TINT = {
   DOCUMENTED_IN: "rgba(148, 163, 184, 0.22)",
 };
 const LINK_DEFAULT = "rgba(42, 58, 92, 0.7)";
+
+// Single source of truth for a node's drawn radius, so the canvas paint, the
+// click hit-area and the collision force all agree. Overlapping hit-areas are
+// what made nodes "unclickable" (the last-painted node wins a shared pixel), so
+// the collision force below keeps nodes physically separated by this radius.
+const nodeRadius = (node, onTrail) =>
+  node.highlight || onTrail ? 7 : 4 + Math.min(node.mentions || 1, 4);
 
 // Tab switches unmount this component (AnimatePresence). Cache the fetched
 // graph AND the simulation-positioned node objects per focus, so coming back
@@ -27,10 +36,11 @@ function cacheFor(version) {
   return graphCache;
 }
 
-export default function GraphView({ focus, trail = [], onFocusEntity, version = 0 }) {
+export default function GraphView({ focus, trail = [], onFocusEntity, onOpenDoc, onAsk, version = 0 }) {
   const cache = cacheFor(version);
   const cacheKey = focus || "__all__";
   const [data, setData] = useState(() => cache.get(cacheKey)?.data || { nodes: [], links: [] });
+  const [selected, setSelected] = useState(null); // node click → entity dossier
   const [dims, setDims] = useState({ w: 600, h: 500 });
   const [hoverType, setHoverType] = useState(null);
   const wrapRef = useRef(null);
@@ -57,6 +67,12 @@ export default function GraphView({ focus, trail = [], onFocusEntity, version = 
     if (!fg) return;
     fg.d3Force("charge")?.strength(-220);
     fg.d3Force("link")?.distance(70);
+    // Collision force keeps nodes from overlapping, so every node keeps its own
+    // clickable pixels. Radius = drawn radius + label headroom + padding.
+    fg.d3Force(
+      "collide",
+      forceCollide((n) => nodeRadius(n, trailNodes.has(n.id)) + 8).strength(0.9)
+    );
     const positioned = cache.get(cacheKey)?.positioned;
     if (typeof positioned?.nodes[0]?.x !== "number") fg.d3ReheatSimulation?.();
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -112,7 +128,7 @@ export default function GraphView({ focus, trail = [], onFocusEntity, version = 
   const types = useMemo(() => Object.keys(typeCounts).sort(), [typeCounts]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-edge text-xs shrink-0">
         <span className="text-slate-400 font-mono">
           <CountUp value={graph.nodes.length} className="text-white" /> entities ·{" "}
@@ -145,7 +161,20 @@ export default function GraphView({ focus, trail = [], onFocusEntity, version = 
           linkDirectionalParticleColor={() => "#fbbf24"}
           linkDirectionalArrowLength={3}
           linkDirectionalArrowRelPos={1}
-          onNodeClick={(n) => onFocusEntity?.(n.label)}
+          onNodeClick={(n) => setSelected(n.label)}
+          nodePointerAreaPaint={(node, color, ctx) => {
+            // A custom nodeCanvasObject is NOT used for hit-testing, so without
+            // this the clickable area defaults to a tiny val-based circle and
+            // most nodes feel "dead". Paint a circle matching the drawn radius
+            // (plus padding) so every node is reliably clickable/hoverable.
+            if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
+            const onTrail = trailNodes.has(node.id);
+            const r = nodeRadius(node, onTrail);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, r + 2, 0, 2 * Math.PI);
+            ctx.fill();
+          }}
           nodeCanvasObject={(node, ctx, scale) => {
             // during a data swap the first frame can arrive before the
             // simulation has placed the node — drawing with non-finite
@@ -154,7 +183,7 @@ export default function GraphView({ focus, trail = [], onFocusEntity, version = 
             const color = TYPE_COLORS[node.type] || "#64748b";
             const onTrail = trailNodes.has(node.id);
             const dimmed = hoverTypeRef.current && node.type !== hoverTypeRef.current && !onTrail;
-            const r = (node.highlight || onTrail ? 7 : 4 + Math.min(node.mentions || 1, 4)) / 1;
+            const r = nodeRadius(node, onTrail);
 
             ctx.globalAlpha = dimmed ? 0.15 : 1;
 
@@ -232,9 +261,18 @@ export default function GraphView({ focus, trail = [], onFocusEntity, version = 
         </div>
 
         <div className="absolute bottom-3 left-3 text-[10px] text-slate-500 glass rounded-lg px-2 py-1 font-mono">
-          click a node to focus · drag to explore
+          tap a node for its dossier · drag to explore
         </div>
       </div>
+
+      {/* clicked node → full entity dossier (same slide-over as the P&ID view) */}
+      <Dossier
+        name={selected}
+        onClose={() => setSelected(null)}
+        onOpenDoc={onOpenDoc}
+        onAsk={onAsk}
+        onFocusEntity={(tag) => setSelected(tag)}
+      />
     </div>
   );
 }

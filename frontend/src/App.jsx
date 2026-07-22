@@ -203,7 +203,7 @@ export default function App() {
               <div className="flex-1 min-h-0">
                 {tab === "docs"
                   ? <Documents openId={openDoc} onClose={() => setOpenDoc(null)} key={"fd" + reloadKey} />
-                  : <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} version={reloadKey} key={"fg" + reloadKey} />}
+                  : <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} onOpenDoc={openDocument} onAsk={askCopilot} version={reloadKey} key={"fg" + reloadKey} />}
               </div>
             </section>
           )}
@@ -247,7 +247,7 @@ export default function App() {
                     className="absolute inset-0"
                   >
                     {tab === "pid" && <PID onOpenDoc={openDocument} onAsk={askCopilot} onFocusEntity={focusEntity} key={"p" + reloadKey} />}
-                    {tab === "graph" && <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} version={reloadKey} key={"g" + reloadKey} />}
+                    {tab === "graph" && <GraphView focus={focus} trail={trail} onFocusEntity={focusEntity} onOpenDoc={openDocument} onAsk={askCopilot} version={reloadKey} key={"g" + reloadKey} />}
                     {tab === "docs" && <Documents openId={openDoc} onClose={() => setOpenDoc(null)} key={"d" + reloadKey} />}
                     {tab === "compliance" && <Compliance onOpenDoc={openDocument} />}
                     {tab === "trust" && <Trust onOpenDoc={openDocument} key={"t" + reloadKey} />}

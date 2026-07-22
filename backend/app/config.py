@@ -85,6 +85,14 @@ def _auth_secret() -> str:
 AUTH_SECRET = _auth_secret()
 TOKEN_TTL_S = int(os.getenv("IIQ_TOKEN_TTL", str(7 * 24 * 3600)))  # 7 days
 
+# CORS: comma-separated allowed origins. Defaults to the local Vite dev/preview
+# ports; set ALLOWED_ORIGINS to your deployed frontend origin(s) in production.
+ALLOWED_ORIGINS: list[str] = [
+    o.strip() for o in
+    os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173").split(",")
+    if o.strip()
+]
+
 
 def status() -> dict:
     """Small dict describing runtime config (safe to expose to the UI)."""

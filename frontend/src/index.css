@@ -22,22 +22,8 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/* Atmosphere: blueprint grid + vignette + scan sweep (GPU-cheap)      */
+/* Atmosphere: vignette + scan sweep (GPU-cheap)                        */
 /* ------------------------------------------------------------------ */
-body::before {
-  content: "";
-  position: fixed;
-  inset: -80px;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px),
-    linear-gradient(rgba(56, 189, 248, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.06) 1px, transparent 1px);
-  background-size: 40px 40px, 40px 40px, 120px 120px, 120px 120px;
-  animation: gridDrift 60s linear infinite;
-}
 body::after {
   content: "";
   position: fixed;
@@ -49,11 +35,6 @@ body::after {
     radial-gradient(ellipse at center, transparent 55%, rgba(2, 4, 10, 0.7) 100%);
 }
 #root { position: relative; z-index: 1; }
-
-@keyframes gridDrift {
-  from { transform: translate(0, 0); }
-  to { transform: translate(40px, 40px); }
-}
 
 /* Scan sweep — a faint control-room radar line drifting down */
 .scanline {
@@ -191,9 +172,31 @@ body::after {
 
 ::selection { background: rgba(245, 166, 35, 0.35); color: #fff; }
 
+/* ------------------------------------------------------------------ */
+/* Decorative animations idle until hovered (issue #3).                */
+/* animation-play-state keeps the animation defined but frozen, so it  */
+/* resumes smoothly on hover with no layout jump. Must stay below the  */
+/* @tailwind utilities + the class definitions to win the cascade.     */
+/* ------------------------------------------------------------------ */
+.animate-float,
+.text-gradient,
+.border-flow {
+  animation-play-state: paused;
+}
+.animate-float:hover,
+.text-gradient:hover,
+.border-flow:hover {
+  animation-play-state: running;
+}
+/* The scanline is a fullscreen pointer-events:none overlay, so it can't be
+   hovered itself — run it while the app is hovered. Frozen it sits off-screen
+   (top:-15%), i.e. hidden, until then. */
+.scanline { animation-play-state: paused; }
+#root:hover .scanline { animation-play-state: running; }
+
 /* Respect users who prefer less motion */
 @media (prefers-reduced-motion: reduce) {
-  body::before, .scanline, .border-flow, .text-gradient,
+  .scanline, .border-flow, .text-gradient,
   .needle-jitter, .live-dot, .danger-dot, .skeleton {
     animation: none !important;
   }

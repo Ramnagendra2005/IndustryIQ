@@ -11,3 +11,4 @@ openpyxl
 pypdf
 python-dotenv
 model2vec
+httpx>=0.27
